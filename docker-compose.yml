@@ -1,0 +1,75 @@
+version: '3.8'
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: tech_store_mysql
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: root_password
+      MYSQL_DATABASE: TechProductDB
+      MYSQL_USER: tech_user
+      MYSQL_PASSWORD: tech_password
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./database/setup.sql:/docker-entrypoint-initdb.d/setup.sql
+    networks:
+      - tech_store_network
+
+  product-service:
+    build: ./backend/product-service
+    container_name: product_service
+    restart: always
+    ports:
+      - "5001:5001"
+    environment:
+      DB_HOST: mysql
+      DB_USER: tech_user
+      DB_PASSWORD: tech_password
+      DB_NAME: TechProductDB
+    depends_on:
+      - mysql
+    networks:
+      - tech_store_network
+
+  order-service:
+    build: ./backend/order-service
+    container_name: order_service
+    restart: always
+    ports:
+      - "5002:5002"
+    environment:
+      DB_HOST: mysql
+      DB_USER: tech_user
+      DB_PASSWORD: tech_password
+      DB_NAME: TechProductDB
+    depends_on:
+      - mysql
+    networks:
+      - tech_store_network
+
+  user-service:
+    build: ./backend/user-service
+    container_name: user_service
+    restart: always
+    ports:
+      - "5003:5003"
+    environment:
+      DB_HOST: mysql
+      DB_USER: tech_user
+      DB_PASSWORD: tech_password
+      DB_NAME: TechProductDB
+      JWT_SECRET: your_jwt_secret_here
+    depends_on:
+      - mysql
+    networks:
+      - tech_store_network
+
+volumes:
+  mysql_data:
+
+networks:
+  tech_store_network:
+    driver: bridge
