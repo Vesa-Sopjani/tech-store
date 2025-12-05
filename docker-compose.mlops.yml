@@ -1,0 +1,68 @@
+version: '3.8'
+services:
+  mlflow:
+    image: ghcr.io/mlflow/mlflow:latest
+    ports:
+      - "5000:5000"
+    environment:
+      - MLFLOW_S3_ENDPOINT_URL=http://minio:9000
+      - AWS_ACCESS_KEY_ID=${MINIO_ACCESS_KEY}
+      - AWS_SECRET_ACCESS_KEY=${MINIO_SECRET_KEY}
+      - MLFLOW_S3_IGNORE_TLS=true
+    volumes:
+      - ./mlflow/artifacts:/mlflow/artifacts
+    command: >
+      mlflow server
+      --backend-store-uri postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres-mlflow/mlflow
+      --default-artifact-root s3://mlflow-artifacts
+      --host 0.0.0.0
+      --port 5000
+    networks:
+      - mlops-network
+
+  minio:
+    image: minio/minio:latest
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      - MINIO_ROOT_USER=${MINIO_ACCESS_KEY}
+      - MINIO_ROOT_PASSWORD=${MINIO_SECRET_KEY}
+    volumes:
+      - ./minio/data:/data
+    command: server /data --console-address ":9001"
+    networks:
+      - mlops-network
+
+  postgres-mlflow:
+    image: postgres:14
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=mlflow
+    volumes:
+      - postgres-mlflow-data:/var/lib/postgresql/data
+    networks:
+      - mlops-network
+
+  tensorflow-serving:
+    image: tensorflow/serving:latest
+    ports:
+      - "8500:8500"
+      - "8501:8501"
+    environment:
+      - MODEL_NAME=recommendation_model
+    volumes:
+      - ./models:/models
+    command: >
+      --model_config_file=/models/models.config
+      --model_config_file_poll_wait_seconds=60
+    networks:
+      - mlops-network
+
+networks:
+  mlops-network:
+    driver: bridge
+
+volumes:
+  postgres-mlflow-data:

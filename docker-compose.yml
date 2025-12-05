@@ -1,75 +1,128 @@
+# docker-compose.yml (i plotësuar)
 version: '3.8'
 
 services:
-  mysql:
-    image: mysql:8.0
-    container_name: tech_store_mysql
-    restart: always
-    environment:
-      MYSQL_ROOT_PASSWORD: root_password
-      MYSQL_DATABASE: TechProductDB
-      MYSQL_USER: tech_user
-      MYSQL_PASSWORD: tech_password
+  # Infrastruktura (ekziston)
+  postgres:
+    # ... më parë
+
+  redis:
+    # ... më parë
+
+  zookeeper:
+    # ... më parë
+
+  kafka:
+    # ... më parë
+
+  # Mikroserviset
+  order-service:
+    build: ./backend/services/order-service
     ports:
-      - "3306:3306"
-    volumes:
-      - mysql_data:/var/lib/mysql
-      - ./database/setup.sql:/docker-entrypoint-initdb.d/setup.sql
+      - "3001:3001"
+    environment:
+      - NODE_ENV=production
+      - POSTGRES_HOST=postgres
+      - REDIS_HOST=redis
+      - KAFKA_BROKER=kafka:9092
+    depends_on:
+      - postgres
+      - redis
+      - kafka
     networks:
-      - tech_store_network
+      - tech-store-network
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3001/health', (r) => {if(r.statusCode !== 200) throw new Error()})"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
   product-service:
-    build: ./backend/product-service
-    container_name: product_service
-    restart: always
+    build: ./backend/services/product-service
     ports:
-      - "5001:5001"
+      - "3002:3002"
     environment:
-      DB_HOST: mysql
-      DB_USER: tech_user
-      DB_PASSWORD: tech_password
-      DB_NAME: TechProductDB
+      - NODE_ENV=production
+      - POSTGRES_HOST=postgres
+      - REDIS_HOST=redis
     depends_on:
-      - mysql
+      - postgres
+      - redis
     networks:
-      - tech_store_network
-
-  order-service:
-    build: ./backend/order-service
-    container_name: order_service
-    restart: always
-    ports:
-      - "5002:5002"
-    environment:
-      DB_HOST: mysql
-      DB_USER: tech_user
-      DB_PASSWORD: tech_password
-      DB_NAME: TechProductDB
-    depends_on:
-      - mysql
-    networks:
-      - tech_store_network
+      - tech-store-network
 
   user-service:
-    build: ./backend/user-service
-    container_name: user_service
-    restart: always
+    build: ./backend/services/user-service
     ports:
-      - "5003:5003"
+      - "3003:3003"
     environment:
-      DB_HOST: mysql
-      DB_USER: tech_user
-      DB_PASSWORD: tech_password
-      DB_NAME: TechProductDB
-      JWT_SECRET: your_jwt_secret_here
+      - NODE_ENV=production
+      - POSTGRES_HOST=postgres
+      - REDIS_HOST=redis
     depends_on:
-      - mysql
+      - postgres
+      - redis
     networks:
-      - tech_store_network
+      - tech-store-network
 
-volumes:
-  mysql_data:
+  api-gateway:
+    build: ./backend/services/api-gateway
+    ports:
+      - "8080:8080"
+    environment:
+      - NODE_ENV=production
+    depends_on:
+      - order-service
+      - product-service
+      - user-service
+    networks:
+      - tech-store-network
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - REACT_APP_API_URL=http://localhost:8080
+    depends_on:
+      - api-gateway
+    networks:
+      - tech-store-network
+
+  # Monitoring (opsionale)
+  prometheus:
+    image: prom/prometheus:latest
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+    networks:
+      - tech-store-network
+
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - "3001:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards
+    depends_on:
+      - prometheus
+    networks:
+      - tech-store-network
 
 networks:
-  tech_store_network:
+  tech-store-network:
     driver: bridge
+
+volumes:
+  postgres_data:
+  redis_data:
+  prometheus_data:
+  grafana_data:

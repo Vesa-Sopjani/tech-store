@@ -1,0 +1,64 @@
+version: '3.8'
+services:
+  redis-node-1:
+    image: redis:7-alpine
+    command: redis-server --requirepass ${REDIS_PASSWORD} --appendonly yes
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data-1:/data
+    networks:
+      - redis-cluster
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  redis-node-2:
+    image: redis:7-alpine
+    command: redis-server --requirepass ${REDIS_PASSWORD} --appendonly yes
+    ports:
+      - "6380:6379"
+    volumes:
+      - redis-data-2:/data
+    networks:
+      - redis-cluster
+    depends_on:
+      redis-node-1:
+        condition: service_healthy
+
+  redis-node-3:
+    image: redis:7-alpine
+    command: redis-server --requirepass ${REDIS_PASSWORD} --appendonly yes
+    ports:
+      - "6381:6379"
+    volumes:
+      - redis-data-3:/data
+    networks:
+      - redis-cluster
+    depends_on:
+      redis-node-2:
+        condition: service_healthy
+
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    environment:
+      - REDIS_HOSTS=local:redis-node-1:6379:0:${REDIS_PASSWORD}
+    ports:
+      - "8081:8081"
+    networks:
+      - redis-cluster
+    depends_on:
+      - redis-node-1
+      - redis-node-2
+      - redis-node-3
+
+volumes:
+  redis-data-1:
+  redis-data-2:
+  redis-data-3:
+
+networks:
+  redis-cluster:
+    driver: bridge

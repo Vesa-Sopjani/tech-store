@@ -1,0 +1,145 @@
+stages:
+  - test
+  - build
+  - security-scan
+  - deploy-staging
+  - integration-test
+  - deploy-production
+
+variables:
+  DOCKER_REGISTRY: registry.gitlab.com/your-username/your-project
+  K8S_NAMESPACE: tech-store
+
+before_script:
+  - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+
+# Unit Tests
+unit-test:
+  stage: test
+  image: node:18-alpine
+  script:
+    - cd backend/services/order-service
+    - npm ci
+    - npm test
+    - npm run test:coverage
+  artifacts:
+    reports:
+      junit: reports/junit.xml
+    paths:
+      - coverage/
+  only:
+    - merge_requests
+    - main
+
+# Security Scanning
+security-scan:
+  stage: security-scan
+  image: 
+    name: aquasec/trivy:latest
+    entrypoint: [""]
+  variables:
+    TRIVY_NO_PROGRESS: "true"
+  script:
+    - trivy fs --severity HIGH,CRITICAL --exit-code 1 .
+    - trivy config --exit-code 1 .
+  allow_failure: false
+
+# SAST
+sast:
+  stage: security-scan
+  image: node:18-alpine
+  script:
+    - npm install -g sonarqube-scanner
+    - sonar-scanner
+      -Dsonar.host.url=${SONARQUBE_URL}
+      -Dsonar.login=${SONARQUBE_TOKEN}
+      -Dsonar.projectKey=tech-store-backend
+
+# Build Docker Images
+build-docker:
+  stage: build
+  image: docker:20.10
+  services:
+    - docker:20.10-dind
+  script:
+    - |
+      for service in order-service product-service user-service; do
+        docker build \
+          -t $DOCKER_REGISTRY/$service:${CI_COMMIT_SHA} \
+          -t $DOCKER_REGISTRY/$service:latest \
+          -f backend/services/$service/Dockerfile \
+          backend/services/$service/
+        docker push $DOCKER_REGISTRY/$service:${CI_COMMIT_SHA}
+        docker push $DOCKER_REGISTRY/$service:latest
+      done
+  only:
+    - main
+    - develop
+
+# Deploy to Staging
+deploy-staging:
+  stage: deploy-staging
+  image: bitnami/kubectl:latest
+  script:
+    - |
+      echo "Deploying to staging..."
+      kubectl config set-cluster k8s-cluster --server=$K8S_SERVER
+      kubectl config set-credentials gitlab-ci --token=$K8S_TOKEN
+      kubectl config set-context default --cluster=k8s-cluster --user=gitlab-ci
+      kubectl config use-context default
+      
+      # Update deployment with new image
+      kubectl -n $K8S_NAMESPACE-staging set image deployment/order-service \
+        order-service=$DOCKER_REGISTRY/order-service:${CI_COMMIT_SHA}
+      
+      # Wait for rollout
+      kubectl -n $K8S_NAMESPACE-staging rollout status deployment/order-service --timeout=300s
+      
+      # Run smoke tests
+      ./scripts/smoke-tests.sh staging
+  environment:
+    name: staging
+    url: https://staging.tech-store.com
+  only:
+    - main
+
+# Chaos Testing
+chaos-test:
+  stage: integration-test
+  image: chaostoolkit/chaostoolkit:latest
+  script:
+    - |
+      echo "Running chaos experiments..."
+      chaos run experiments/network-loss.json
+      chaos run experiments/pod-failure.json
+  allow_failure: false
+
+# Deploy to Production (Canary)
+deploy-production:
+  stage: deploy-production
+  image: bitnami/kubectl:latest
+  script:
+    - |
+      echo "Starting canary deployment..."
+      
+      # Deploy canary version
+      kubectl apply -f k8s/canary/order-service-canary.yaml
+      
+      # Monitor metrics
+      ./scripts/monitor-canary.sh
+      
+      # If metrics are good, promote to full deployment
+      if [ "$?" -eq "0" ]; then
+        kubectl apply -f k8s/production/order-service.yaml
+        kubectl delete -f k8s/canary/order-service-canary.yaml
+      else
+        echo "Canary deployment failed - rolling back"
+        kubectl delete -f k8s/canary/order-service-canary.yaml
+        exit 1
+      fi
+  environment:
+    name: production
+    url: https://tech-store.com
+  only:
+    - main
+  when: manual

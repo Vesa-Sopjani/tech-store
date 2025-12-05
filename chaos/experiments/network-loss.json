@@ -1,0 +1,63 @@
+{
+  "version": "1.0.0",
+  "title": "Network Latency Injection",
+  "description": "Inject network latency between order-service and product-service",
+  "steady-state-hypothesis": {
+    "title": "Services are healthy",
+    "probes": [
+      {
+        "type": "probe",
+        "name": "services-should-be-healthy",
+        "tolerance": 200,
+        "provider": {
+          "type": "http",
+          "url": "http://order-service:3000/health",
+          "timeout": 5
+        }
+      }
+    ]
+  },
+  "method": [
+    {
+      "type": "action",
+      "name": "inject-network-latency",
+      "provider": {
+        "type": "python",
+        "module": "chaosk8s.network.actions",
+        "func": "create_network_fault",
+        "arguments": {
+          "name": "network-latency-fault",
+          "namespace": "default",
+          "label_selector": "app=order-service",
+          "faults": [
+            {
+              "type": "latency",
+              "latency": "500ms",
+              "percentage": 50,
+              "direction": "egress",
+              "target_label_selector": "app=product-service"
+            }
+          ]
+        }
+      },
+      "pauses": {
+        "after": 60
+      }
+    }
+  ],
+  "rollbacks": [
+    {
+      "type": "action",
+      "name": "remove-network-fault",
+      "provider": {
+        "type": "python",
+        "module": "chaosk8s.network.actions",
+        "func": "delete_network_fault",
+        "arguments": {
+          "name": "network-latency-fault",
+          "namespace": "default"
+        }
+      }
+    }
+  ]
+}

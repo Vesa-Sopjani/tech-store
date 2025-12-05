@@ -1,0 +1,118 @@
+{
+  "dashboard": {
+    "title": "Microservices Monitoring",
+    "panels": [
+      {
+        "title": "Request Rate",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(istio_requests_total{destination_service=~\"order-service|product-service\"}[5m])",
+            "legendFormat": "{{destination_service}}"
+          }
+        ]
+      },
+      {
+        "title": "Error Rate",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(istio_requests_total{response_code=~\"5..\", destination_service=~\"order-service|product-service\"}[5m])",
+            "legendFormat": "{{destination_service}}"
+          }
+        ],
+        "thresholds": [
+          {
+            "value": 0.05,
+            "colorMode": "critical",
+            "fill": true,
+            "line": true,
+            "op": "gt"
+          }
+        ]
+      },
+      {
+        "title": "Latency P95",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, sum(rate(istio_request_duration_milliseconds_bucket{destination_service=~\"order-service|product-service\"}[5m])) by (le, destination_service))",
+            "legendFormat": "{{destination_service}}"
+          }
+        ]
+      },
+      {
+        "title": "CPU Usage",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(container_cpu_usage_seconds_total{pod=~\"order-service.*\"}[5m]) * 100",
+            "legendFormat": "Order Service"
+          }
+        ]
+      },
+      {
+        "title": "Memory Usage",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "container_memory_working_set_bytes{pod=~\"order-service.*\"} / 1024 / 1024",
+            "legendFormat": "Order Service (MB)"
+          }
+        ]
+      },
+      {
+        "title": "Kafka Lag",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "kafka_consumer_group_lag{group=\"order-processing\"}",
+            "legendFormat": "Order Processing Lag"
+          }
+        ]
+      },
+      {
+        "title": "Redis Hit Rate",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "redis_keyspace_hits_total / (redis_keyspace_hits_total + redis_keyspace_misses_total) * 100",
+            "legendFormat": "Hit Rate"
+          }
+        ],
+        "thresholds": [
+          {
+            "value": 80,
+            "colorMode": "critical",
+            "fill": true,
+            "line": true,
+            "op": "lt"
+          }
+        ]
+      },
+      {
+        "title": "Database Connections",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "pg_stat_database_numbackends{datname=\"orders\"}",
+            "legendFormat": "Active Connections"
+          }
+        ]
+      },
+      {
+        "title": "Service Health Status",
+        "type": "heatmap",
+        "targets": [
+          {
+            "expr": "up{job=~\"microservices\"}",
+            "legendFormat": "{{instance}}"
+          }
+        ]
+      }
+    ],
+    "refresh": "10s",
+    "schemaVersion": 27,
+    "version": 1
+  }
+}
