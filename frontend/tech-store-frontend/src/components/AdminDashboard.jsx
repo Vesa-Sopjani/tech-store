@@ -1,392 +1,477 @@
+// src/components/AdminDashboard.jsx
 import React, { useState, useEffect } from 'react';
-import { useAuth } from '../contexts/AuthContext';
-import { adminService } from '../services/api';
-import './AdminDashboard.css';
-import ProductManagement from './ProductManagement';
-import UserManagement from './UserManagement';
+import { FiUsers, FiPackage, FiShoppingCart, FiDollarSign, FiAlertCircle, FiTrendingUp, FiActivity, FiRefreshCw } from 'react-icons/fi';
+import { 
+  MdDashboard, 
+  MdShoppingCart, 
+  MdInventory, 
+  MdPeople, 
+  MdBarChart, 
+  MdSettings,
+  MdNotifications,
+  MdInsertChart
+} from 'react-icons/md';
+import { Line, Bar, Pie } from 'react-chartjs-2';
+import Chart from 'chart.js/auto';
+import { format, subDays, subMonths } from 'date-fns';
+import { toast } from 'react-toastify';
 
 const AdminDashboard = () => {
-  const { user } = useAuth();
-  const [statistics, setStatistics] = useState(null);
-  const [realtimeData, setRealtimeData] = useState(null);
-  const [allOrders, setAllOrders] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [stats, setStats] = useState({
+    totalUsers: 0,
+    totalProducts: 0,
+    totalOrders: 0,
+    totalRevenue: 0,
+    lowStockProducts: 0,
+    todayOrders: 0,
+    todayRevenue: 0
+  });
+  
   const [activeTab, setActiveTab] = useState('overview');
+  const [recentOrders, setRecentOrders] = useState([]);
+  const [topProducts, setTopProducts] = useState([]);
+  const [userActivity, setUserActivity] = useState([]);
+  const [grafanaUrl, setGrafanaUrl] = useState('http://localhost:3000/dashboard');
+
+  // Sample data for demo
+  const sampleStats = {
+    totalUsers: 1567,
+    totalProducts: 342,
+    totalOrders: 2894,
+    totalRevenue: 128450.75,
+    lowStockProducts: 12,
+    todayOrders: 24,
+    todayRevenue: 12850.00
+  };
+
+  const sampleRecentOrders = [
+    { id: 'ORD-1001', customer: 'John Doe', amount: 1299.99, status: 'completed', date: new Date() },
+    { id: 'ORD-1002', customer: 'Jane Smith', amount: 799.99, status: 'processing', date: subDays(new Date(), 1) },
+    { id: 'ORD-1003', customer: 'Bob Johnson', amount: 249.99, status: 'pending', date: subDays(new Date(), 2) },
+    { id: 'ORD-1004', customer: 'Alice Brown', amount: 1599.99, status: 'completed', date: subDays(new Date(), 1) },
+    { id: 'ORD-1005', customer: 'Charlie Wilson', amount: 349.99, status: 'shipped', date: new Date() },
+  ];
+
+  const sampleTopProducts = [
+    { name: 'iPhone 15 Pro', sales: 156, revenue: 155844 },
+    { name: 'MacBook Pro 16"', sales: 89, revenue: 311611 },
+    { name: 'AirPods Pro', sales: 234, revenue: 58566 },
+    { name: 'iPad Pro', sales: 123, revenue: 123000 },
+    { name: 'Apple Watch', sales: 178, revenue: 71200 },
+  ];
+
+  const sampleUserActivity = [
+    { username: 'johndoe', orders: 12, lastActive: new Date() },
+    { username: 'janesmith', orders: 8, lastActive: subDays(new Date(), 1) },
+    { username: 'bobjohnson', orders: 15, lastActive: new Date() },
+    { username: 'alicebrown', orders: 6, lastActive: subDays(new Date(), 2) },
+    { username: 'charliewilson', orders: 21, lastActive: new Date() },
+  ];
 
   useEffect(() => {
-    if (user && user.role === 'admin') {
-      fetchDashboardData();
-    }
-  }, [user]);
+    fetchDashboardData();
+  }, []);
 
   const fetchDashboardData = async () => {
     try {
       setLoading(true);
       
-      const [statsResponse, realtimeResponse, ordersResponse] = await Promise.all([
-        adminService.getStatistics(),
-        adminService.getRealtimeData(),
-        adminService.getOrders({ limit: 100 })
-      ]);
-
-      if (statsResponse.data.success) {
-        setStatistics(statsResponse.data.data);
-      }
+      // In real app, fetch from API
+      await new Promise(resolve => setTimeout(resolve, 1000));
       
-      if (realtimeResponse.data.success) {
-        setRealtimeData(realtimeResponse.data.data);
-      }
-      
-      if (ordersResponse.data.success) {
-        setAllOrders(ordersResponse.data.data.orders);
-      }
+      setStats(sampleStats);
+      setRecentOrders(sampleRecentOrders);
+      setTopProducts(sampleTopProducts);
+      setUserActivity(sampleUserActivity);
       
     } catch (error) {
-      console.error('Gabim në marrjen e të dhënave:', error);
-      setStatistics(getDemoStatistics());
-      setRealtimeData(getDemoRealtimeData());
-      setAllOrders(getDemoOrders());
+      console.error('Error fetching dashboard data:', error);
+      toast.error('Could not load dashboard data');
     } finally {
       setLoading(false);
     }
   };
 
-  const getDemoStatistics = () => ({
-    overview: {
-      totalUsers: 12,
-      totalProducts: 6,
-      totalOrders: allOrders.length,
-      totalRevenue: allOrders.reduce((sum, order) => sum + parseFloat(order.total_amount || 0), 0),
-      lowStockProducts: 2
-    },
-    monthlyOrders: [
-      { month: '2024-01', order_count: 8, revenue: 2450.75 },
-      { month: '2024-02', order_count: 12, revenue: 3890.50 }
-    ],
-    topProducts: [
-      { id: 1, name: 'iPhone 15 Pro', total_sold: 5, total_revenue: 5999.95 },
-      { id: 2, name: 'MacBook Pro 14"', total_sold: 3, total_revenue: 7499.85 },
-      { id: 3, name: 'AirPods Pro', total_sold: 8, total_revenue: 1999.92 }
-    ],
-    newUsers: [
-      { date: '2024-02-01', user_count: 2 },
-      { date: '2024-02-02', user_count: 1 }
+  // Chart data
+  const revenueChartData = {
+    labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul'],
+    datasets: [
+      {
+        label: 'Revenue ($)',
+        data: [45000, 52000, 48000, 61000, 72000, 68000, 75000],
+        borderColor: 'rgb(59, 130, 246)',
+        backgroundColor: 'rgba(59, 130, 246, 0.1)',
+        fill: true,
+        tension: 0.4
+      }
     ]
-  });
+  };
 
-  const getDemoRealtimeData = () => ({
-    recentOrders: allOrders.slice(0, 5).map(order => ({
-      id: order.id,
-      username: order.username || 'user',
-      total_amount: order.total_amount,
-      status: order.status || 'completed',
-      created_at: order.created_at
-    })),
-    userActivity: [
-      { username: 'user1', order_count: 3, last_order: new Date() },
-      { username: 'user2', order_count: 2, last_order: new Date() }
-    ],
-    quickStats: {
-      todayOrders: allOrders.filter(order => 
-        new Date(order.created_at).toDateString() === new Date().toDateString()
-      ).length,
-      todayRevenue: allOrders
-        .filter(order => new Date(order.created_at).toDateString() === new Date().toDateString())
-        .reduce((sum, order) => sum + parseFloat(order.total_amount || 0), 0),
-      weeklyRevenue: allOrders
-        .filter(order => {
-          const weekAgo = new Date();
-          weekAgo.setDate(weekAgo.getDate() - 7);
-          return new Date(order.created_at) >= weekAgo;
-        })
-        .reduce((sum, order) => sum + parseFloat(order.total_amount || 0), 0)
-    }
-  });
+  const ordersChartData = {
+    labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+    datasets: [
+      {
+        label: 'Orders',
+        data: [65, 59, 80, 81, 56, 55, 40],
+        backgroundColor: 'rgba(139, 92, 246, 0.7)',
+        borderColor: 'rgba(139, 92, 246, 1)',
+        borderWidth: 1
+      }
+    ]
+  };
 
-  const getDemoOrders = () => [
-    {
-      id: 1001,
-      total_amount: '299.99',
-      status: 'completed',
-      created_at: new Date().toISOString(),
-      username: 'user1',
-      items: [
-        { product_name: 'iPhone 15 Pro', quantity: 1, unit_price: '299.99' }
-      ]
-    },
-    {
-      id: 1002,
-      total_amount: '1599.99',
-      status: 'processing',
-      created_at: new Date().toISOString(),
-      username: 'user2',
-      items: [
-        { product_name: 'MacBook Pro 14"', quantity: 1, unit_price: '1599.99' }
-      ]
-    }
-  ];
+  const categoryChartData = {
+    labels: ['Smartphones', 'Laptops', 'Audio', 'Wearables', 'Accessories'],
+    datasets: [
+      {
+        data: [35, 25, 20, 12, 8],
+        backgroundColor: [
+          'rgba(59, 130, 246, 0.8)',
+          'rgba(139, 92, 246, 0.8)',
+          'rgba(245, 158, 11, 0.8)',
+          'rgba(34, 197, 94, 0.8)',
+          'rgba(239, 68, 68, 0.8)',
+        ]
+      }
+    ]
+  };
 
-  const updateOrderStatus = async (orderId, newStatus) => {
-    try {
-      await adminService.updateOrderStatus(orderId, newStatus);
-      fetchDashboardData();
-    } catch (error) {
-      console.error('Gabim në përditësimin e statusit:', error);
+  const chartOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: {
+        display: true,
+        position: 'bottom'
+      }
     }
   };
 
-  if (!user || user.role !== 'admin') {
-    return (
-      <div style={{ textAlign: 'center', padding: '2rem' }}>
-        <h2>🔒 Akses i Kufizuar</h2>
-        <p>Ju nuk keni të drejta administrative për të parë këtë faqe.</p>
-      </div>
-    );
-  }
-
   if (loading) {
     return (
-      <div className="admin-dashboard">
-        <div className="loading">🔄 Duke ngarkuar Admin Dashboard...</div>
+      <div className="flex items-center justify-center h-96">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading dashboard...</p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="admin-dashboard">
-      <div className="dashboard-header">
-        <h1>🎛️ Dashboard i Adminit</h1>
-        <p>Mirë se vini, {user?.username}! Këtu mund të menaxhoni të gjithë sistemin.</p>
-        <button 
-          onClick={fetchDashboardData}
-          className="btn btn-primary"
-          style={{ marginTop: '1rem' }}
-        >
-          🔄 Refresh Data
-        </button>
-      </div>
-
-      {/* Statistikat e shpejta */}
-      {statistics && (
-        <div className="stats-grid">
-          <div className="stat-card">
-            <div className="stat-icon">👥</div>
-            <div className="stat-info">
-              <h3>{statistics.overview.totalUsers}</h3>
-              <p>Total Përdorues</p>
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
+      {/* Dashboard Header */}
+      <div className="bg-white shadow-sm border-b">
+        <div className="container mx-auto px-4 py-6">
+          <div className="flex flex-col md:flex-row md:items-center justify-between">
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900 flex items-center">
+                <MdDashboard className="mr-3 text-blue-600" />
+                Admin Dashboard
+              </h1>
+              <p className="text-gray-600 mt-2">
+                Monitor and manage your store performance
+              </p>
             </div>
-          </div>
-          
-          <div className="stat-card">
-            <div className="stat-icon">📦</div>
-            <div className="stat-info">
-              <h3>{statistics.overview.totalProducts}</h3>
-              <p>Total Produkte</p>
-            </div>
-          </div>
-          
-          <div className="stat-card">
-            <div className="stat-icon">🛒</div>
-            <div className="stat-info">
-              <h3>{statistics.overview.totalOrders}</h3>
-              <p>Total Porosi</p>
-            </div>
-          </div>
-          
-          <div className="stat-card revenue">
-            <div className="stat-icon">💰</div>
-            <div className="stat-info">
-              <h3>{parseFloat(statistics.overview.totalRevenue).toFixed(2)} €</h3>
-              <p>Total Të Ardhura</p>
-            </div>
-          </div>
-          
-          <div className="stat-card warning">
-            <div className="stat-icon">⚠️</div>
-            <div className="stat-info">
-              <h3>{statistics.overview.lowStockProducts}</h3>
-              <p>Produkte me Stok të Ulet</p>
+            <div className="flex items-center space-x-4 mt-4 md:mt-0">
+              <button
+                onClick={fetchDashboardData}
+                className="flex items-center px-4 py-2 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-lg hover:shadow-lg transition-shadow"
+              >
+                <FiRefreshCw className="mr-2" />
+                Refresh Data
+              </button>
+              <div className="relative">
+                <MdNotifications className="text-2xl text-gray-600 cursor-pointer" />
+                <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                  3
+                </span>
+              </div>
             </div>
           </div>
         </div>
-      )}
-
-      {/* Tabs */}
-      <div className="dashboard-tabs">
-        <button className={`tab-button ${activeTab === 'overview' ? 'active' : ''}`}
-          onClick={() => setActiveTab('overview')}>
-          📊 Përmbledhje
-        </button>
-        <button className={`tab-button ${activeTab === 'orders' ? 'active' : ''}`}
-          onClick={() => setActiveTab('orders')}>
-          🛒 Të Gjitha Porositë
-        </button>
-        <button className={`tab-button ${activeTab === 'products' ? 'active' : ''}`}
-          onClick={() => setActiveTab('products')}>
-          📦 Produktet
-        </button>
-        <button className={`tab-button ${activeTab === 'users' ? 'active' : ''}`}
-          onClick={() => setActiveTab('users')}>
-          👥 Përdoruesit
-        </button>
       </div>
 
-      {/* Përmbajtja e tabs - KORRIGJUAR */}
-      <div className="tab-content">
-        {activeTab === 'overview' && <OverviewTab statistics={statistics} realtimeData={realtimeData} />}
-        {activeTab === 'orders' && <OrdersTab orders={allOrders} onUpdateStatus={updateOrderStatus} />}
-        {activeTab === 'products' && <ProductManagement />}
-        {activeTab === 'users' && <UserManagement />}
+      {/* Quick Stats */}
+      <div className="container mx-auto px-4 py-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          <div className="bg-white rounded-xl shadow-lg p-6 border-l-4 border-blue-500">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-gray-600 text-sm">Total Revenue</p>
+                <h3 className="text-3xl font-bold text-gray-900 mt-2">
+                  ${stats.totalRevenue.toLocaleString()}
+                </h3>
+              </div>
+              <div className="p-3 bg-blue-100 rounded-full">
+                <FiDollarSign className="text-2xl text-blue-600" />
+              </div>
+            </div>
+            <div className="mt-4 flex items-center text-green-600 text-sm">
+              <FiTrendingUp className="mr-1" />
+              <span>+12.5% from last month</span>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-xl shadow-lg p-6 border-l-4 border-purple-500">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-gray-600 text-sm">Total Orders</p>
+                <h3 className="text-3xl font-bold text-gray-900 mt-2">
+                  {stats.totalOrders.toLocaleString()}
+                </h3>
+              </div>
+              <div className="p-3 bg-purple-100 rounded-full">
+                <FiShoppingCart className="text-2xl text-purple-600" />
+              </div>
+            </div>
+            <div className="mt-4 flex items-center text-green-600 text-sm">
+              <FiTrendingUp className="mr-1" />
+              <span>+8.3% from last month</span>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-xl shadow-lg p-6 border-l-4 border-green-500">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-gray-600 text-sm">Total Customers</p>
+                <h3 className="text-3xl font-bold text-gray-900 mt-2">
+                  {stats.totalUsers.toLocaleString()}
+                </h3>
+              </div>
+              <div className="p-3 bg-green-100 rounded-full">
+                <FiUsers className="text-2xl text-green-600" />
+              </div>
+            </div>
+            <div className="mt-4 flex items-center text-green-600 text-sm">
+              <FiTrendingUp className="mr-1" />
+              <span>+5.2% from last month</span>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-xl shadow-lg p-6 border-l-4 border-orange-500">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-gray-600 text-sm">Low Stock Alert</p>
+                <h3 className="text-3xl font-bold text-gray-900 mt-2">
+                  {stats.lowStockProducts}
+                </h3>
+              </div>
+              <div className="p-3 bg-orange-100 rounded-full">
+                <FiAlertCircle className="text-2xl text-orange-600" />
+              </div>
+            </div>
+            <div className="mt-4 text-orange-600 text-sm">
+              Products need restocking
+            </div>
+          </div>
+        </div>
+
+        {/* Charts Section */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+          {/* Revenue Chart */}
+          <div className="bg-white rounded-xl shadow-lg p-6">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-xl font-bold text-gray-900">Revenue Trend</h3>
+              <select className="px-3 py-1 border rounded-lg text-sm">
+                <option>Last 7 days</option>
+                <option>Last 30 days</option>
+                <option>Last 90 days</option>
+              </select>
+            </div>
+            <div className="h-64">
+              <Line data={revenueChartData} options={chartOptions} />
+            </div>
+          </div>
+
+          {/* Orders Chart */}
+          <div className="bg-white rounded-xl shadow-lg p-6">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-xl font-bold text-gray-900">Daily Orders</h3>
+              <select className="px-3 py-1 border rounded-lg text-sm">
+                <option>This Week</option>
+                <option>Last Week</option>
+                <option>This Month</option>
+              </select>
+            </div>
+            <div className="h-64">
+              <Bar data={ordersChartData} options={chartOptions} />
+            </div>
+          </div>
+        </div>
+
+        {/* Bottom Section */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* Recent Orders */}
+          <div className="lg:col-span-2">
+            <div className="bg-white rounded-xl shadow-lg p-6">
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-xl font-bold text-gray-900">Recent Orders</h3>
+                <button className="text-blue-600 hover:text-blue-700 text-sm font-medium">
+                  View All →
+                </button>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="text-left text-gray-600 border-b">
+                      <th className="pb-3">Order ID</th>
+                      <th className="pb-3">Customer</th>
+                      <th className="pb-3">Amount</th>
+                      <th className="pb-3">Status</th>
+                      <th className="pb-3">Date</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {recentOrders.map((order) => (
+                      <tr key={order.id} className="border-b hover:bg-gray-50">
+                        <td className="py-4 font-medium">{order.id}</td>
+                        <td className="py-4">{order.customer}</td>
+                        <td className="py-4 font-bold">${order.amount.toFixed(2)}</td>
+                        <td className="py-4">
+                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                            order.status === 'completed' ? 'bg-green-100 text-green-800' :
+                            order.status === 'processing' ? 'bg-blue-100 text-blue-800' :
+                            order.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                            'bg-purple-100 text-purple-800'
+                          }`}>
+                            {order.status}
+                          </span>
+                        </td>
+                        <td className="py-4 text-gray-500 text-sm">
+                          {format(order.date, 'MMM dd, HH:mm')}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          {/* Sidebar */}
+          <div className="space-y-8">
+            {/* Top Products */}
+            <div className="bg-white rounded-xl shadow-lg p-6">
+              <h3 className="text-xl font-bold text-gray-900 mb-6">Top Products</h3>
+              <div className="space-y-4">
+                {topProducts.map((product, index) => (
+                  <div key={product.name} className="flex items-center justify-between">
+                    <div className="flex items-center">
+                      <span className="w-8 h-8 flex items-center justify-center bg-gray-100 rounded-full mr-3">
+                        {index + 1}
+                      </span>
+                      <div>
+                        <p className="font-medium">{product.name}</p>
+                        <p className="text-sm text-gray-500">{product.sales} sales</p>
+                      </div>
+                    </div>
+                    <span className="font-bold">${product.revenue.toLocaleString()}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Category Distribution */}
+            <div className="bg-white rounded-xl shadow-lg p-6">
+              <h3 className="text-xl font-bold text-gray-900 mb-6">Category Distribution</h3>
+              <div className="h-48">
+                <Pie data={categoryChartData} options={chartOptions} />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Grafana Integration Section */}
+        <div className="mt-8">
+          <div className="bg-gradient-to-r from-blue-900 to-purple-900 rounded-xl shadow-lg p-6 text-white">
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h3 className="text-2xl font-bold mb-2">Advanced Analytics</h3>
+                <p className="text-blue-200">Powered by Grafana</p>
+              </div>
+              <MdInsertChart className="text-4xl" />
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+              <button 
+                onClick={() => window.open(`${grafanaUrl}/sales`, '_blank')}
+                className="bg-white/10 hover:bg-white/20 p-4 rounded-lg transition-colors"
+              >
+                <div className="text-xl font-bold mb-2">📈</div>
+                <h4 className="font-semibold mb-1">Sales Dashboard</h4>
+                <p className="text-blue-200 text-sm">Detailed sales analytics</p>
+              </button>
+              
+              <button 
+                onClick={() => window.open(`${grafanaUrl}/users`, '_blank')}
+                className="bg-white/10 hover:bg-white/20 p-4 rounded-lg transition-colors"
+              >
+                <div className="text-xl font-bold mb-2">👥</div>
+                <h4 className="font-semibold mb-1">User Analytics</h4>
+                <p className="text-blue-200 text-sm">User behavior & demographics</p>
+              </button>
+              
+              <button 
+                onClick={() => window.open(`${grafanaUrl}/inventory`, '_blank')}
+                className="bg-white/10 hover:bg-white/20 p-4 rounded-lg transition-colors"
+              >
+                <div className="text-xl font-bold mb-2">📊</div>
+                <h4 className="font-semibold mb-1">Inventory Stats</h4>
+                <p className="text-blue-200 text-sm">Stock levels & turnover</p>
+              </button>
+            </div>
+
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-4">
+                <input
+                  type="text"
+                  value={grafanaUrl}
+                  onChange={(e) => setGrafanaUrl(e.target.value)}
+                  placeholder="Enter Grafana URL"
+                  className="px-4 py-2 bg-white/10 border border-white/20 rounded-lg text-white placeholder-white/50 w-64"
+                />
+                <button 
+                  onClick={() => window.open(grafanaUrl, '_blank')}
+                  className="px-6 py-2 bg-white text-blue-900 font-semibold rounded-lg hover:bg-gray-100 transition-colors"
+                >
+                  Open Grafana
+                </button>
+              </div>
+              <div className="flex items-center space-x-2">
+                <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                <span className="text-sm">Grafana Connected</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Quick Actions */}
+        <div className="mt-8 grid grid-cols-2 md:grid-cols-4 gap-4">
+          <button className="flex flex-col items-center justify-center p-6 bg-white rounded-xl shadow-lg hover:shadow-xl transition-shadow">
+            <MdShoppingCart className="text-3xl text-blue-600 mb-3" />
+            <span className="font-medium">Manage Orders</span>
+          </button>
+          
+          <button className="flex flex-col items-center justify-center p-6 bg-white rounded-xl shadow-lg hover:shadow-xl transition-shadow">
+            <MdInventory className="text-3xl text-purple-600 mb-3" />
+            <span className="font-medium">Inventory</span>
+          </button>
+          
+          <button className="flex flex-col items-center justify-center p-6 bg-white rounded-xl shadow-lg hover:shadow-xl transition-shadow">
+            <MdPeople className="text-3xl text-green-600 mb-3" />
+            <span className="font-medium">Customers</span>
+          </button>
+          
+          <button className="flex flex-col items-center justify-center p-6 bg-white rounded-xl shadow-lg hover:shadow-xl transition-shadow">
+            <MdSettings className="text-3xl text-orange-600 mb-3" />
+            <span className="font-medium">Settings</span>
+          </button>
+        </div>
       </div>
     </div>
   );
 };
-
-// Komponentët e tabs (OverviewTab, OrdersTab, etc. mbeten të njëjtë)
-const OverviewTab = ({ statistics, realtimeData }) => (
-  <div className="overview-content">
-    {realtimeData && (
-      <div className="content-section">
-        <h3>🕒 Aktiviteti i Fundit (24 Orët)</h3>
-        <div className="realtime-stats">
-          <div className="realtime-stat">
-            <span className="stat-value">{realtimeData.quickStats.todayOrders}</span>
-            <span className="stat-label">Porosi Sot</span>
-          </div>
-          <div className="realtime-stat">
-            <span className="stat-value">{parseFloat(realtimeData.quickStats.todayRevenue).toFixed(2)} €</span>
-            <span className="stat-label">Të Ardhura Sot</span>
-          </div>
-          <div className="realtime-stat">
-            <span className="stat-value">{parseFloat(realtimeData.quickStats.weeklyRevenue).toFixed(2)} €</span>
-            <span className="stat-label">Të Ardhura Javore</span>
-          </div>
-        </div>
-
-        <div className="recent-orders">
-          <h4>Porositë e Fundit</h4>
-          {realtimeData.recentOrders.map(order => (
-            <div key={order.id} className="order-item">
-              <span className="order-id">#{order.id}</span>
-              <span className="order-user">{order.username}</span>
-              <span className="order-amount">{parseFloat(order.total_amount).toFixed(2)} €</span>
-              <span className={`order-status status-${order.status}`}>
-                {order.status}
-              </span>
-              <span className="order-time">
-                {new Date(order.created_at).toLocaleTimeString('sq-AL')}
-              </span>
-            </div>
-          ))}
-        </div>
-      </div>
-    )}
-
-    {statistics && (
-      <div className="charts-section">
-        <div className="chart-container">
-          <h4>🏆 Produktet Më të Shitura</h4>
-          <div className="top-products">
-            {statistics.topProducts.map((product, index) => (
-              <div key={product.id} className="product-rank">
-                <span className="rank">#{index + 1}</span>
-                <span className="product-name">{product.name}</span>
-                <span className="sold-count">{product.total_sold} shitje</span>
-                <span className="revenue">{parseFloat(product.total_revenue).toFixed(2)} €</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-    )}
-  </div>
-);
-
-const OrdersTab = ({ orders, onUpdateStatus }) => (
-  <div className="orders-content">
-    <h3>🛒 Të Gjitha Porositë ({orders.length})</h3>
-    
-    <div className="orders-list">
-      {orders.map(order => (
-        <div key={order.id} className="order-card">
-          <div className="order-header">
-            <div>
-              <h4>Porosia #{order.id}</h4>
-              <p><strong>Klienti:</strong> {order.username} ({order.full_name})</p>
-              <p><strong>Data:</strong> {new Date(order.created_at).toLocaleString('sq-AL')}</p>
-              <p><strong>Totali:</strong> {parseFloat(order.total_amount).toFixed(2)} €</p>
-            </div>
-            <div className="order-actions">
-              <span className={`order-status status-${order.status}`}>
-                {order.status}
-              </span>
-              <select 
-                value={order.status} 
-                onChange={(e) => onUpdateStatus(order.id, e.target.value)}
-                className="status-select"
-              >
-                <option value="pending">Pending</option>
-                <option value="processing">Processing</option>
-                <option value="completed">Completed</option>
-                <option value="cancelled">Cancelled</option>
-              </select>
-            </div>
-          </div>
-          
-          <div className="order-items">
-            <h5>Artikujt:</h5>
-            {order.items && order.items.map(item => (
-              <div key={item.id} className="order-item-detail">
-                <span>{item.product_name}</span>
-                <span>Sasia: {item.quantity}</span>
-                <span>{parseFloat(item.unit_price).toFixed(2)} €</span>
-                <span>Total: {parseFloat(item.total_price).toFixed(2)} €</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      ))}
-    </div>
-  </div>
-);
-
-const ProductsTab = ({ statistics }) => (
-  <div className="products-content">
-    <h3>📦 Menaxhimi i Produkteve</h3>
-    <div className="admin-actions">
-      <button className="btn btn-primary">➕ Shto Produkt të Ri</button>
-      <button className="btn btn-secondary">✏️ Edit Produkte</button>
-      <button className="btn btn-warning">📊 Shiko Statistikat</button>
-    </div>
-    
-    {statistics && (
-      <div className="products-stats">
-        <h4>Statistikat e Produkteve</h4>
-        <div className="stats-grid-small">
-          <div className="stat-small">
-            <span className="stat-number">{statistics.overview.totalProducts}</span>
-            <span className="stat-label">Total Produkte</span>
-          </div>
-          <div className="stat-small">
-            <span className="stat-number">{statistics.overview.lowStockProducts}</span>
-            <span className="stat-label">Stok i Ulet</span>
-          </div>
-        </div>
-      </div>
-    )}
-  </div>
-);
-
-const UsersTab = () => (
-  <div className="users-content">
-    <h3>👥 Menaxhimi i Përdoruesve</h3>
-    <div className="admin-actions">
-      <button className="btn btn-primary">👀 Shiko të Gjithë Përdoruesit</button>
-      <button className="btn btn-secondary">🎭 Ndrysho Rolet</button>
-      <button className="btn btn-info">📧 Dërgo Email</button>
-    </div>
-    <p>Menaxhimi i përdoruesve dhe të drejtave të aksesit.</p>
-  </div>
-);
 
 export default AdminDashboard;

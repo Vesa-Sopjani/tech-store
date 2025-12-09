@@ -88,7 +88,21 @@ export const orderService = {
   }),
   getUserOrders: (userId) => apiRequest(`/api/orders/user/${userId}`),
 };
-
+// Add to your existing api.js
+export const adminService = {
+  getStatistics: () => apiRequest('/api/admin/statistics'),
+  getRealtimeData: () => apiRequest('/api/admin/realtime'),
+  getOrders: (params) => apiRequest(`/api/admin/orders?${new URLSearchParams(params)}`),
+  updateOrderStatus: (orderId, status) => 
+    apiRequest(`/api/admin/orders/${orderId}/status`, {
+      method: 'PUT',
+      body: JSON.stringify({ status })
+    }),
+  
+  // Grafana specific
+  getGrafanaDashboards: () => apiRequest('/api/grafana/dashboards'),
+  getGrafanaMetrics: () => apiRequest('/api/grafana/metrics'),
+};
 // Users API (admin only)
 export const userService = {
   getAll: () => apiRequest('/api/users'),
