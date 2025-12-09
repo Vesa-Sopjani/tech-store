@@ -1,125 +1,103 @@
-import axios from 'axios'
+// src/services/api.js
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 
-// Konfigurimi bazë i axios
-const API = axios.create({
-  baseURL: 'http://localhost:5001',
-  timeout: 10000,
-})
+// Helper function for API calls
+export const apiRequest = async (endpoint, options = {}) => {
+  const token = localStorage.getItem('techstore_token');
+  
+  const defaultHeaders = {
+    'Content-Type': 'application/json',
+  };
 
-// Interceptor për të shtuar tokenin automatikisht
-API.interceptors.request.use(
-  (config) => {
-    const token = localStorage.getItem('token')
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`
-    }
-    return config
-  },
-  (error) => {
-    return Promise.reject(error)
+  if (token) {
+    defaultHeaders['Authorization'] = `Bearer ${token}`;
   }
-)
 
-// Shërbimet e Produkteve
-export const productService = {
-  getAllProducts: (filters = {}) => 
-    API.get('/api/products', { params: filters }),
-  
-  getProductById: (id) => 
-    API.get(`/api/products/${id}`),
-  
-  getCategories: () => 
-    API.get('/api/categories')
-}
+  try {
+    const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+      ...options,
+      headers: {
+        ...defaultHeaders,
+        ...options.headers,
+      },
+      mode: 'cors', // Explicitly set CORS mode
+    });
 
-// Shërbimet e Porosive
-export const orderService = {
-  createOrder: (orderData) => 
-    axios.post('http://localhost:5002/api/orders', orderData, {
-      headers: {
-        'Authorization': `Bearer ${localStorage.getItem('token')}`
-      }
-    }),
-  
-  getUserOrders: (userId) => 
-    axios.get(`http://localhost:5002/api/orders/user/${userId}`, {
-      headers: {
-        'Authorization': `Bearer ${localStorage.getItem('token')}`
-      }
-    }),
-  
-  getOrderById: (id) => 
-    axios.get(`http://localhost:5002/api/orders/${id}`, {
-      headers: {
-        'Authorization': `Bearer ${localStorage.getItem('token')}`
-      }
-    })
-}
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+    }
 
-// Shërbimet e Autentikimit
+    return await response.json();
+  } catch (error) {
+    console.error('API Request Error:', error);
+    throw error;
+  }
+};
+
+// Auth API
 export const authService = {
-  login: (credentials) => 
-    axios.post('http://localhost:5003/api/auth/login', credentials),
-  
-  register: (userData) => 
-    axios.post('http://localhost:5003/api/auth/register', userData),
-  
-  getProfile: () => 
-    axios.get('http://localhost:5003/api/users/profile', {
-      headers: {
-        'Authorization': `Bearer ${localStorage.getItem('token')}`
-      }
-    }),
-  
-  updateProfile: (profileData) => 
-    axios.put('http://localhost:5003/api/users/profile', profileData, {
-      headers: {
-        'Authorization': `Bearer ${localStorage.getItem('token')}`
-      }
-    })
-}
+  login: async (credentials) => {
+    return apiRequest('/api/auth/login', {
+      method: 'POST',
+      body: JSON.stringify(credentials),
+    });
+  },
 
-// Shërbimet e Adminit
-export const adminService = {
-  getStatistics: () => 
-    axios.get('http://localhost:5004/api/admin/statistics', {
-      headers: {
-        'Authorization': `Bearer ${localStorage.getItem('token')}`
-      }
-    }),
-  
-  getOrders: (params = {}) => 
-    axios.get('http://localhost:5004/api/admin/orders', {
-      params,
-      headers: {
-        'Authorization': `Bearer ${localStorage.getItem('token')}`
-      }
-    }),
-  
-  getUsers: (params = {}) => 
-    axios.get('http://localhost:5004/api/admin/users', {
-      params,
-      headers: {
-        'Authorization': `Bearer ${localStorage.getItem('token')}`
-      }
-    }),
-  
-  getRealtimeData: () => 
-    axios.get('http://localhost:5004/api/admin/realtime', {
-      headers: {
-        'Authorization': `Bearer ${localStorage.getItem('token')}`
-      }
-    }),
-  
-  updateOrderStatus: (orderId, status) => 
-    axios.put(`http://localhost:5004/api/admin/orders/${orderId}/status`, 
-      { status },
-      {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
-      }
-    )
-}
+  register: async (userData) => {
+    return apiRequest('/api/auth/register', {
+      method: 'POST',
+      body: JSON.stringify(userData),
+    });
+  },
 
-export default API
+  verify: async () => {
+    return apiRequest('/api/auth/verify');
+  },
+
+  logout: () => {
+    localStorage.removeItem('techstore_token');
+    localStorage.removeItem('techstore_user');
+  },
+};
+
+// Products API
+export const productService = {
+  getAll: () => apiRequest('/api/products'),
+  getById: (id) => apiRequest(`/api/products/${id}`),
+  create: (product) => apiRequest('/api/products', {
+    method: 'POST',
+    body: JSON.stringify(product),
+  }),
+  update: (id, product) => apiRequest(`/api/products/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(product),
+  }),
+  delete: (id) => apiRequest(`/api/products/${id}`, {
+    method: 'DELETE',
+  }),
+};
+
+// Orders API
+export const orderService = {
+  getAll: () => apiRequest('/api/orders'),
+  getById: (id) => apiRequest(`/api/orders/${id}`),
+  create: (order) => apiRequest('/api/orders', {
+    method: 'POST',
+    body: JSON.stringify(order),
+  }),
+  getUserOrders: (userId) => apiRequest(`/api/orders/user/${userId}`),
+};
+
+// Users API (admin only)
+export const userService = {
+  getAll: () => apiRequest('/api/users'),
+  getById: (id) => apiRequest(`/api/users/${id}`),
+  update: (id, userData) => apiRequest(`/api/users/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(userData),
+  }),
+  delete: (id) => apiRequest(`/api/users/${id}`, {
+    method: 'DELETE',
+  }),
+};

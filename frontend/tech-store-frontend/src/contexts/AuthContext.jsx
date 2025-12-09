@@ -1,61 +1,78 @@
-import React, { createContext, useState, useContext, useEffect } from 'react'
+// src/contexts/AuthContext.jsx
+import React, { createContext, useState, useContext, useEffect } from 'react';
+import { toast } from 'react-toastify';
 
-const AuthContext = createContext()
+const AuthContext = createContext({});
 
-export const useAuth = () => {
-  const context = useContext(AuthContext)
-  if (!context) {
-    throw new Error('useAuth duhet të përdoret brenda një AuthProvider')
-  }
-  return context
-}
+export const useAuth = () => useContext(AuthContext);
 
 export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(null)
-  const [loading, setLoading] = useState(true)
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const token = localStorage.getItem('token')
-    const userData = localStorage.getItem('user')
-    
-    if (token && userData) {
+    // Load user from localStorage on app start
+    const savedUser = localStorage.getItem('techstore_user');
+    if (savedUser) {
       try {
-        const parsedUser = JSON.parse(userData)
-        console.log('Loading user from storage:', parsedUser)
-        setUser(parsedUser)
+        const userData = JSON.parse(savedUser);
+        setUser(userData);
       } catch (error) {
-        console.error('Gabim në parsing e të dhënave të përdoruesit:', error)
-        localStorage.removeItem('token')
-        localStorage.removeItem('user')
+        console.error('Error loading user from localStorage:', error);
+        localStorage.removeItem('techstore_user');
+        localStorage.removeItem('techstore_token');
       }
     }
-    setLoading(false)
-  }, [])
+    setLoading(false);
+  }, []);
 
   const login = (userData, token) => {
-    console.log('Logging in user:', userData)
-    setUser(userData)
-    localStorage.setItem('token', token)
-    localStorage.setItem('user', JSON.stringify(userData))
-  }
+    const userWithToken = {
+      ...userData,
+      token: token || userData.token
+    };
+    
+    setUser(userWithToken);
+    localStorage.setItem('techstore_user', JSON.stringify(userWithToken));
+    if (token) {
+      localStorage.setItem('techstore_token', token);
+    }
+    toast.success(`Mirë se vini, ${userData.name}!`);
+  };
+
+  const register = (userData, token) => {
+    const userWithToken = {
+      ...userData,
+      token: token || userData.token
+    };
+    
+    setUser(userWithToken);
+    localStorage.setItem('techstore_user', JSON.stringify(userWithToken));
+    if (token) {
+      localStorage.setItem('techstore_token', token);
+    }
+    toast.success('Regjistrimi u krye me sukses!');
+  };
 
   const logout = () => {
-    console.log('Logging out user')
-    setUser(null)
-    localStorage.removeItem('token')
-    localStorage.removeItem('user')
-  }
+    setUser(null);
+    localStorage.removeItem('techstore_user');
+    localStorage.removeItem('techstore_token');
+    toast.info('Jeni çkyçur me sukses');
+  };
 
-  const value = {
-    user,
-    login,
-    logout,
-    loading
-  }
+  const isAdmin = user?.role === 'admin';
 
   return (
-    <AuthContext.Provider value={value}>
+    <AuthContext.Provider value={{
+      user,
+      loading,
+      login,
+      register,
+      logout,
+      isAdmin
+    }}>
       {children}
     </AuthContext.Provider>
-  )
-}
+  );
+};

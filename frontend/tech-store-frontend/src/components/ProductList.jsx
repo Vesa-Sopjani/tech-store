@@ -1,150 +1,156 @@
-import React, { useState, useEffect } from 'react'
-import { Link } from 'react-router-dom'
-import { productService } from '../services/api'
+// frontend/src/components/ProductList.jsx
+import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
+import { toast } from 'react-toastify';
+import { FiStar, FiHeart, FiShoppingCart } from 'react-icons/fi';
 
-const ProductList = () => {
-  const [products, setProducts] = useState([])
-  const [categories, setCategories] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [filters, setFilters] = useState({
-    category: '',
-    search: '',
-    minPrice: '',
-    maxPrice: ''
-  })
+const ProductList = ({ products, addToCart, user }) => {
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState('All');
+  const [wishlist, setWishlist] = useState([]);
 
-  useEffect(() => {
-    fetchProducts()
-    fetchCategories()
-  }, [filters])
+  const categories = ['All', 'Electronics', 'Computers', 'Phones', 'Audio', 'Wearables'];
 
-  const fetchProducts = async () => {
-    try {
-      setLoading(true)
-      const response = await productService.getAllProducts(filters)
-      if (response.data.success) {
-        setProducts(response.data.data)
-      }
-    } catch (error) {
-      console.error('Gabim në marrjen e produkteve:', error)
-    } finally {
-      setLoading(false)
+  const filteredProducts = products.filter(product => {
+    const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         product.description.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesCategory = selectedCategory === 'All' || product.category === selectedCategory;
+    return matchesSearch && matchesCategory;
+  });
+
+  const toggleWishlist = (product) => {
+    if (!user) {
+      toast.error('Please login to add to wishlist');
+      return;
     }
-  }
-
-  const fetchCategories = async () => {
-    try {
-      const response = await productService.getCategories()
-      if (response.data.success) {
-        setCategories(response.data.data)
-      }
-    } catch (error) {
-      console.error('Gabim në marrjen e kategorive:', error)
+    
+    if (wishlist.includes(product.id)) {
+      setWishlist(wishlist.filter(id => id !== product.id));
+      toast.info('Removed from wishlist');
+    } else {
+      setWishlist([...wishlist, product.id]);
+      toast.success('Added to wishlist!');
     }
-  }
-
-  const handleFilterChange = (key, value) => {
-    setFilters(prev => ({
-      ...prev,
-      [key]: value
-    }))
-  }
-
-  if (loading) {
-    return <div className="loading">Duke ngarkuar produktet...</div>
-  }
+  };
 
   return (
-    <div>
-      <div className="filters" style={{ 
-        padding: '1rem 0', 
-        display: 'flex', 
-        gap: '1rem', 
-        flexWrap: 'wrap',
-        alignItems: 'center'
-      }}>
-        <div className="form-group">
+    <div className="space-y-8">
+      {/* Hero Section */}
+      <div className="bg-gradient-to-r from-blue-600 to-purple-600 rounded-3xl p-8 text-white">
+        <h1 className="text-4xl font-bold mb-4">Discover Amazing Tech</h1>
+        <p className="text-blue-100 mb-6">Premium electronics with the latest technology</p>
+        <div className="relative max-w-2xl">
           <input
             type="text"
-            placeholder="Kërko produkte..."
-            value={filters.search}
-            onChange={(e) => handleFilterChange('search', e.target.value)}
-            className="form-control"
-            style={{ minWidth: '200px' }}
+            placeholder="Search products..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full px-6 py-4 rounded-full bg-white/20 backdrop-blur-sm text-white placeholder-white/70 focus:outline-none focus:ring-2 focus:ring-white"
           />
-        </div>
-        
-        <div className="form-group">
-          <select
-            value={filters.category}
-            onChange={(e) => handleFilterChange('category', e.target.value)}
-            className="form-control"
-          >
-            <option value="">Të gjitha kategoritë</option>
-            {categories.map(category => (
-              <option key={category.id} value={category.name}>
-                {category.name}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <div className="form-group">
-          <input
-            type="number"
-            placeholder="Çmimi minimal"
-            value={filters.minPrice}
-            onChange={(e) => handleFilterChange('minPrice', e.target.value)}
-            className="form-control"
-            style={{ width: '150px' }}
-          />
-        </div>
-
-        <div className="form-group">
-          <input
-            type="number"
-            placeholder="Çmimi maksimal"
-            value={filters.maxPrice}
-            onChange={(e) => handleFilterChange('maxPrice', e.target.value)}
-            className="form-control"
-            style={{ width: '150px' }}
-          />
+          <div className="absolute right-3 top-3">
+            🔍
+          </div>
         </div>
       </div>
 
-      <div className="products-grid">
-        {products.map(product => (
-          <div key={product.id} className="product-card">
-            <img 
-              src={product.image_url || '/placeholder-product.jpg'} 
-              alt={product.name}
-              className="product-image"
-            />
-            <h3 className="product-name">{product.name}</h3>
-            <p className="product-price">{product.price} €</p>
-            <p className="product-description">
-              {product.description?.substring(0, 100)}...
-            </p>
-            <div style={{ display: 'flex', gap: '0.5rem' }}>
-              <Link to={`/product/${product.id}`} className="btn btn-primary">
-                Shiko Detajet
-              </Link>
-              <button className="btn btn-success">
-                Shto në Shportë
-              </button>
-            </div>
-          </div>
+      {/* Filters */}
+      <div className="flex flex-wrap gap-4 items-center">
+        {categories.map(category => (
+          <button
+            key={category}
+            onClick={() => setSelectedCategory(category)}
+            className={`px-6 py-2 rounded-full font-medium transition-all ${
+              selectedCategory === category
+                ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white'
+                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+            }`}
+          >
+            {category}
+          </button>
         ))}
       </div>
 
-      {products.length === 0 && (
-        <div style={{ textAlign: 'center', padding: '2rem' }}>
-          <h3>Nuk u gjet asnjë produkt</h3>
-          <p>Provoni të ndryshoni filtrat e kërkimit</p>
+      {/* Products Grid */}
+      {filteredProducts.length === 0 ? (
+        <div className="text-center py-12">
+          <div className="text-6xl mb-4">🔍</div>
+          <h3 className="text-2xl font-bold text-gray-900 mb-2">No products found</h3>
+          <p className="text-gray-600">Try adjusting your search or filters</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
+          {filteredProducts.map(product => (
+            <div key={product.id} className="product-card group">
+              {/* Product Image */}
+              <div className="relative overflow-hidden h-56">
+                <img
+                  src={product.image}
+                  alt={product.name}
+                  className="product-image"
+                />
+                <button
+                  onClick={() => toggleWishlist(product)}
+                  className={`absolute top-4 right-4 p-2 rounded-full ${
+                    wishlist.includes(product.id)
+                      ? 'bg-red-500 text-white'
+                      : 'bg-white/90 text-gray-700 hover:bg-red-500 hover:text-white'
+                  } transition-all`}
+                >
+                  <FiHeart className={wishlist.includes(product.id) ? 'fill-current' : ''} />
+                </button>
+                {product.discount && (
+                  <div className="absolute top-4 left-4 px-3 py-1 bg-gradient-to-r from-red-500 to-orange-500 text-white rounded-full text-sm font-bold">
+                    -{product.discount}%
+                  </div>
+                )}
+              </div>
+
+              {/* Product Info */}
+              <div className="p-6">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="px-3 py-1 bg-blue-50 text-blue-600 rounded-full text-sm">
+                    {product.category}
+                  </span>
+                  <div className="flex items-center">
+                    <FiStar className="text-yellow-400 fill-current" />
+                    <span className="ml-1 font-semibold">{product.rating || '4.5'}</span>
+                  </div>
+                </div>
+
+                <h3 className="text-lg font-bold text-gray-900 mb-2 line-clamp-1">
+                  <Link to={`/products/${product.id}`} className="hover:text-purple-600">
+                    {product.name}
+                  </Link>
+                </h3>
+                <p className="text-gray-600 text-sm mb-4 line-clamp-2">
+                  {product.description}
+                </p>
+
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+                      ${product.price}
+                    </div>
+                    {product.originalPrice && (
+                      <div className="text-sm text-gray-400 line-through">
+                        ${product.originalPrice}
+                      </div>
+                    )}
+                  </div>
+                  <button
+                    onClick={() => addToCart(product)}
+                    className="p-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-full hover:shadow-xl hover:shadow-purple-500/25 transition-all"
+                  >
+                    <FiShoppingCart className="text-lg" />
+                  </button>
+                </div>
+              </div>
+            </div>
+          ))}
         </div>
       )}
     </div>
-  )
-}
+  );
+};
 
-export default ProductList
+export default ProductList;
