@@ -1,5 +1,6 @@
 // src/services/api.js
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+const API_BASE_URL = import.meta.env.VITE_API_URL;
+
 
 // Helper function for API calls
 export const apiRequest = async (endpoint, options = {}) => {
@@ -88,6 +89,25 @@ export const orderService = {
   }),
   getUserOrders: (userId) => apiRequest(`/api/orders/user/${userId}`),
 };
+
+export const categoryService = {
+  getAll: () => apiRequest('/api/categories'),
+  getById: (id) => apiRequest(`/api/categories/${id}`),
+  getPopular: () => apiRequest('/api/categories/popular'), // ← vetëm kjo shtohet nëse do përdorësh "popular"
+  create: (category) => apiRequest('/api/categories', {
+    method: 'POST',
+    body: JSON.stringify(category),
+  }),
+  update: (id, category) => apiRequest(`/api/categories/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(category),
+  }),
+  delete: (id) => apiRequest(`/api/categories/${id}`, {
+    method: 'DELETE',
+  }),
+};
+
+
 // Add to your existing api.js
 export const adminService = {
   getStatistics: () => apiRequest('/api/admin/statistics'),

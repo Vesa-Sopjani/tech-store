@@ -4,6 +4,7 @@ import { BrowserRouter as Router, Routes, Route, Link, useNavigate } from 'react
 import axios from 'axios';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
+import CategoriesPage from './components/CategoryPage';
 
 // Icons (You can install react-icons: npm install react-icons)
 import { 
@@ -461,6 +462,7 @@ function App() {
                 </section>
 
                 {/* Categories Section */}
+
                 <section>
                   <div className="flex justify-between items-center mb-8">
                     <h2 className="text-3xl font-bold text-gray-900">Shop by Category</h2>
@@ -473,7 +475,11 @@ function App() {
                       <div 
                         key={index}
                         className="bg-white p-6 rounded-2xl shadow-lg hover:shadow-2xl transition-shadow cursor-pointer group"
-                        onClick={() => setSelectedCategory(category.name)}
+                        onClick={() => {
+  setSelectedCategory(category.name);
+  navigate('/categories');
+}}
+
                       >
                         <div className="text-3xl mb-4">{category.icon}</div>
                         <h3 className="font-semibold text-gray-900 mb-2">{category.name}</h3>
@@ -484,6 +490,8 @@ function App() {
                   </div>
                 </section>
 
+
+                
                 {/* Featured Products */}
                 <section>
                   <div className="flex justify-between items-center mb-8">
@@ -800,6 +808,24 @@ function App() {
                 </div>
               </div>
             } />
+
+            <Route
+  path="/categories"
+  element={
+    <CategoriesPage
+      categories={categories}
+      products={products}
+      selectedCategory={selectedCategory}
+      setSelectedCategory={setSelectedCategory}
+      filteredProducts={filteredProducts}
+      addToCart={addToCart}
+      toggleWishlist={toggleWishlist}
+      wishlist={wishlist}
+    />
+  }
+/>
+
+
 
             {/* Register Page */}
             <Route path="/register" element={
