@@ -1,0 +1,18 @@
+// backend/kafka/schemas/user-registered.avsc
+{
+  "type": "record",
+  "name": "UserRegistered",
+  "namespace": "tech.store.events",
+  "fields": [
+    {"name": "eventId", "type": "string"},
+    {"name": "eventType", "type": {"type": "enum", "symbols": ["USER_REGISTERED"]}},
+    {"name": "timestamp", "type": "string"},
+    {"name": "userId", "type": "string"},
+    {"name": "email", "type": "string"},
+    {"name": "username", "type": "string"},
+    {"name": "fullName", "type": "string"},
+    {"name": "role", "type": "string"},
+    {"name": "ipAddress", "type": ["null", "string"], "default": null},
+    {"name": "userAgent", "type": ["null", "string"], "default": null}
+  ]
+}

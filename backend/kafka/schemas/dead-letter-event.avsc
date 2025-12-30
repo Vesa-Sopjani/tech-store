@@ -1,0 +1,15 @@
+// backend/kafka/schemas/dead-letter-event.avsc
+{
+  "type": "record",
+  "name": "DeadLetterEvent",
+  "namespace": "tech.store.events",
+  "fields": [
+    {"name": "eventId", "type": "string"},
+    {"name": "originalTopic", "type": "string"},
+    {"name": "originalEvent", "type": "string"},
+    {"name": "failureReason", "type": "string"},
+    {"name": "timestamp", "type": "string"},
+    {"name": "retryCount", "type": "int", "default": 0},
+    {"name": "payload", "type": "string"}
+  ]
+}

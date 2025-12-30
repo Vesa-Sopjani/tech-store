@@ -1,17 +1,21 @@
-// frontend/src/App.jsx
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import CategoriesPage from './components/CategoryPage';
+import Register from "./components/auth/Register";
+import { AuthProvider } from './contexts/AuthContext';
+import Login from "./components/auth/Login";
+import Header from './components/Header'; // ✅ KËTU ËSHTË HEADER-I YT
+import ProtectedRoute from './components/auth/ProtectedRoute';
+import Logout from "./components/auth/Logout"; // Shto këtë linjë
 
-// Icons (You can install react-icons: npm install react-icons)
-import { 
-  FiShoppingCart, 
-  FiUser, 
-  FiLogOut, 
-  FiLogIn, 
+import {
+  FiShoppingCart,
+  FiUser,
+  FiLogOut,
+  FiLogIn,
   FiUserPlus,
   FiHome,
   FiPackage,
@@ -32,13 +36,14 @@ import {
   FiShoppingBag,
   FiBell,
   FiSettings,
-  FiHelpCircle
+  FiHelpCircle,
+  FiGrid
 } from 'react-icons/fi';
 
-import { 
-  FaFacebook, 
-  FaTwitter, 
-  FaInstagram, 
+import {
+  FaFacebook,
+  FaTwitter,
+  FaInstagram,
   FaLinkedin,
   FaGoogle,
   FaApple,
@@ -49,7 +54,7 @@ import {
 } from 'react-icons/fa';
 
 // API configuration
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -170,6 +175,7 @@ const categories = [
   { name: 'Drones', icon: '🚁', count: 15 },
 ];
 
+// Main App Component
 function App() {
   const [products, setProducts] = useState(mockProducts);
   const [cart, setCart] = useState([]);
@@ -189,7 +195,7 @@ function App() {
   // Filter products based on search and category
   const filteredProducts = products.filter(product => {
     const matchesSearch = product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         product.description.toLowerCase().includes(searchQuery.toLowerCase());
+      product.description.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesCategory = selectedCategory === 'All' || product.category === selectedCategory;
     return matchesSearch && matchesCategory;
   });
@@ -197,10 +203,10 @@ function App() {
   // Add to cart function
   const addToCart = (product) => {
     const existingItem = cart.find(item => item.id === product.id);
-    
+
     if (existingItem) {
-      setCart(cart.map(item => 
-        item.id === product.id 
+      setCart(cart.map(item =>
+        item.id === product.id
           ? { ...item, quantity: item.quantity + 1 }
           : item
       ));
@@ -264,746 +270,633 @@ function App() {
   };
 
   return (
-    <Router>
-      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
-        {/* Top Announcement Bar */}
-        <div className="bg-gradient-to-r from-blue-600 to-purple-600 text-white py-2 px-4">
-          <div className="container mx-auto text-center text-sm">
-            🚀 Free shipping on orders over $100 | 🔥 Limited time: Get 20% off with code TECH20
-          </div>
-        </div>
-
-        {/* Main Navigation */}
-        <nav className="bg-white shadow-lg sticky top-0 z-50">
-          <div className="container mx-auto px-4 py-4">
-            <div className="flex items-center justify-between">
-              {/* Logo */}
-              <Link to="/" className="flex items-center space-x-3">
-                <div className="bg-gradient-to-r from-blue-600 to-purple-600 p-2 rounded-xl">
-                  <FiShoppingBag className="text-white text-2xl" />
-                </div>
-                <div>
-                  <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-                    TechHub
-                  </h1>
-                  <p className="text-xs text-gray-500">Premium Electronics Store</p>
-                </div>
-              </Link>
-
-              {/* Desktop Navigation */}
-              <div className="hidden md:flex items-center space-x-8">
-                <Link to="/" className="flex items-center space-x-2 text-gray-700 hover:text-blue-600 transition-colors">
-                  <FiHome />
-                  <span>Home</span>
-                </Link>
-                <Link to="/products" className="flex items-center space-x-2 text-gray-700 hover:text-blue-600 transition-colors">
-                  <FiPackage />
-                  <span>Products</span>
-                </Link>
-                <Link to="/categories" className="flex items-center space-x-2 text-gray-700 hover:text-blue-600 transition-colors">
-                  <FiFilter />
-                  <span>Categories</span>
-                </Link>
-                <Link to="/deals" className="text-red-600 hover:text-red-700 font-semibold transition-colors">
-                  🔥 Hot Deals
-                </Link>
-              </div>
-
-              {/* Search Bar */}
-              <div className="hidden md:block flex-1 max-w-lg mx-8">
-                <div className="relative">
-                  <FiSearch className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400" />
-                  <input
-                    type="text"
-                    placeholder="Search products..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full pl-12 pr-4 py-3 bg-gray-100 rounded-full focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white"
-                  />
-                </div>
-              </div>
-
-              {/* User Actions */}
-              <div className="flex items-center space-x-4">
-                {/* Wishlist */}
-                <button className="relative p-2 hover:bg-gray-100 rounded-full transition-colors">
-                  <FiHeart className="text-xl text-gray-700" />
-                  {wishlist.length > 0 && (
-                    <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
-                      {wishlist.length}
-                    </span>
-                  )}
-                </button>
-
-                {/* Cart */}
-                <Link to="/cart" className="relative p-2 hover:bg-gray-100 rounded-full transition-colors">
-                  <FiShoppingCart className="text-xl text-gray-700" />
-                  {cartItemCount > 0 && (
-                    <span className="absolute -top-1 -right-1 bg-blue-600 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
-                      {cartItemCount}
-                    </span>
-                  )}
-                </Link>
-
-                {/* User Menu */}
-                {isAuthenticated ? (
-                  <div className="relative group">
-                    <button className="flex items-center space-x-2 p-2 hover:bg-gray-100 rounded-full transition-colors">
-                      <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center text-white font-semibold">
-                        {user?.name?.charAt(0) || 'U'}
-                      </div>
-                    </button>
-                    <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-2xl py-2 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
-                      <Link to="/profile" className="flex items-center space-x-2 px-4 py-3 hover:bg-gray-50">
-                        <FiUser />
-                        <span>Profile</span>
-                      </Link>
-                      <Link to="/orders" className="flex items-center space-x-2 px-4 py-3 hover:bg-gray-50">
-                        <FiPackage />
-                        <span>My Orders</span>
-                      </Link>
-                      <Link to="/settings" className="flex items-center space-x-2 px-4 py-3 hover:bg-gray-50">
-                        <FiSettings />
-                        <span>Settings</span>
-                      </Link>
-                      <button className="flex items-center space-x-2 px-4 py-3 hover:bg-gray-50 w-full text-left text-red-600">
-                        <FiLogOut />
-                        <span>Logout</span>
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="flex items-center space-x-3">
-                    <Link to="/login" className="px-6 py-2 text-blue-600 hover:text-blue-700 font-medium">
-                      Login
-                    </Link>
-                    <Link to="/register" className="px-6 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-full hover:shadow-lg transition-shadow">
-                      Sign Up
-                    </Link>
-                  </div>
-                )}
-
-                {/* Mobile Menu Button */}
-                <button 
-                  className="md:hidden p-2"
-                  onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-                >
-                  {mobileMenuOpen ? <FiX className="text-2xl" /> : <FiMenu className="text-2xl" />}
-                </button>
-              </div>
+    <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+      <AuthProvider>
+        <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
+          {/* Top Announcement Bar */}
+          <div className="bg-gradient-to-r from-blue-600 to-purple-600 text-white py-2 px-4">
+            <div className="container mx-auto text-center text-sm">
+              🚀 Free shipping on orders over $100 | 🔥 Limited time: Get 20% off with code TECH20
             </div>
+          </div>
 
-            {/* Mobile Search */}
-            <div className="md:hidden mt-4">
-              <div className="relative">
-                <FiSearch className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400" />
-                <input
-                  type="text"
-                  placeholder="Search products..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-12 pr-4 py-3 bg-gray-100 rounded-full focus:outline-none focus:ring-2 focus:ring-blue-500"
+          {/* Custom Header me të gjitha elementet */}
+         {/* Custom Header me të gjitha elementet */}
+          <Header 
+            cartItemCount={cartItemCount} 
+            wishlistCount={wishlist.length}
+          />
+
+          {/* Main Content */}
+          <div className="container mx-auto px-4 py-8">
+            <Routes>
+              {/* Home Page */}
+              <Route path="/" element={
+                <HomePage 
+                  categories={categories}
+                  products={products}
+                  wishlist={wishlist}
+                  addToCart={addToCart}
+                  toggleWishlist={toggleWishlist}
+                  setSelectedCategory={setSelectedCategory}
                 />
-              </div>
-            </div>
+              } />
+
+              {/* Products Page */}
+              <Route path="/products" element={
+                <ProductsPage 
+                  categories={categories}
+                  selectedCategory={selectedCategory}
+                  setSelectedCategory={setSelectedCategory}
+                  filteredProducts={filteredProducts}
+                  addToCart={addToCart}
+                  toggleWishlist={toggleWishlist}
+                  wishlist={wishlist}
+                  searchQuery={searchQuery}
+                  setSearchQuery={setSearchQuery}
+                />
+              } />
+
+              {/* Categories Page */}
+              <Route path="/categories" element={
+                <CategoriesPage
+                  categories={categories}
+                  products={products}
+                  selectedCategory={selectedCategory}
+                  setSelectedCategory={setSelectedCategory}
+                  filteredProducts={filteredProducts}
+                  addToCart={addToCart}
+                  toggleWishlist={toggleWishlist}
+                  wishlist={wishlist}
+                />
+              } />
+
+              {/* Wishlist Page */}
+              <Route path="/wishlist" element={
+                <WishlistPage 
+                  wishlist={wishlist}
+                  toggleWishlist={toggleWishlist}
+                  addToCart={addToCart}
+                />
+              } />
+
+              {/* Profile Page */}
+              <Route path="/profile" element={
+                <ProtectedRoute>
+                  <div className="max-w-4xl mx-auto">
+                    <h1 className="text-3xl font-bold mb-8">Profili Im</h1>
+                    <div className="bg-white rounded-2xl shadow-lg p-8">
+                      <p>Kjo është faqja e profilit. Shiko më vonë për më shumë detaje!</p>
+                    </div>
+                  </div>
+                </ProtectedRoute>
+              } />
+
+              {/* Orders Page */}
+              <Route path="/orders" element={
+                <ProtectedRoute>
+                  <div className="max-w-4xl mx-auto">
+                    <h1 className="text-3xl font-bold mb-8">Porositë e Mia</h1>
+                    <div className="bg-white rounded-2xl shadow-lg p-8">
+                      <p>Këtu do të shfaqen porositë e tua. Shiko më vonë!</p>
+                    </div>
+                  </div>
+                </ProtectedRoute>
+              } />
+
+              {/* Admin Dashboard */}
+              <Route path="/admin/dashboard" element={
+                <ProtectedRoute allowedRoles={['admin', 'administrator']}>
+                  <div className="max-w-6xl mx-auto">
+                    <h1 className="text-3xl font-bold mb-8">Admin Dashboard</h1>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                      <div className="bg-white rounded-2xl shadow-lg p-6">
+                        <h3 className="text-lg font-bold mb-4">Statistikat</h3>
+                        <p>Total Users: --</p>
+                        <p>Total Orders: --</p>
+                        <p>Revenue: --</p>
+                      </div>
+                      <div className="bg-white rounded-2xl shadow-lg p-6">
+                        <h3 className="text-lg font-bold mb-4">Menaxhimi</h3>
+                        <Link to="/admin/products" className="block py-2 hover:text-blue-600">
+                          Menaxho Produktet
+                        </Link>
+                        <Link to="/admin/users" className="block py-2 hover:text-blue-600">
+                          Menaxho Përdoruesit
+                        </Link>
+                        <Link to="/admin/orders" className="block py-2 hover:text-blue-600">
+                          Menaxho Porositë
+                        </Link>
+                      </div>
+                    </div>
+                  </div>
+                </ProtectedRoute>
+              } />
+
+              {/* Cart Page */}
+              <Route path="/cart" element={
+                <CartPage 
+                  cart={cart}
+                  cartTotal={cartTotal}
+                  cartItemCount={cartItemCount}
+                  removeFromCart={removeFromCart}
+                  updateQuantity={updateQuantity}
+                  clearCart={clearCart}
+                  checkout={checkout}
+                  isAuthenticated={isAuthenticated}
+                />
+              } />
+
+              <Route path="/register" element={<Register />} />
+              <Route path="/login" element={<Login />} />
+              <Route path="/logout" element={<Logout />} /> {/* Shto këtë linjë */}
+
+            </Routes>
           </div>
 
-          {/* Mobile Menu */}
-          {mobileMenuOpen && (
-            <div className="md:hidden bg-white border-t">
-              <div className="container mx-auto px-4 py-4 space-y-4">
-                <Link to="/" className="block py-2 text-gray-700 hover:text-blue-600">Home</Link>
-                <Link to="/products" className="block py-2 text-gray-700 hover:text-blue-600">Products</Link>
-                <Link to="/categories" className="block py-2 text-gray-700 hover:text-blue-600">Categories</Link>
-                <Link to="/deals" className="block py-2 text-red-600 font-semibold">Hot Deals</Link>
-                <Link to="/cart" className="block py-2 text-gray-700 hover:text-blue-600">Cart</Link>
-                <Link to="/orders" className="block py-2 text-gray-700 hover:text-blue-600">Orders</Link>
+          {/* Footer */}
+          <footer className="bg-gray-900 text-white mt-16">
+            <div className="container mx-auto px-4 py-12">
+              <div className="grid md:grid-cols-2 lg:grid-cols-5 gap-8">
+                <div className="lg:col-span-2">
+                  <Link to="/" className="flex items-center space-x-3 mb-6">
+                    <div className="bg-gradient-to-r from-blue-500 to-purple-500 p-2 rounded-xl">
+                      <FiShoppingBag className="text-white text-2xl" />
+                    </div>
+                    <div>
+                      <h1 className="text-2xl font-bold">TechHub</h1>
+                      <p className="text-gray-400">Premium Electronics Store</p>
+                    </div>
+                  </Link>
+                  <p className="text-gray-400 mb-6">
+                    Discover the latest tech gadgets and premium electronics with fast delivery and excellent customer service.
+                  </p>
+                  <div className="flex space-x-4">
+                    <a href="#" className="w-10 h-10 bg-gray-800 rounded-full flex items-center justify-center hover:bg-blue-600">
+                      <FaFacebook />
+                    </a>
+                    <a href="#" className="w-10 h-10 bg-gray-800 rounded-full flex items-center justify-center hover:bg-blue-400">
+                      <FaTwitter />
+                    </a>
+                    <a href="#" className="w-10 h-10 bg-gray-800 rounded-full flex items-center justify-center hover:bg-pink-600">
+                      <FaInstagram />
+                    </a>
+                    <a href="#" className="w-10 h-10 bg-gray-800 rounded-full flex items-center justify-center hover:bg-blue-700">
+                      <FaLinkedin />
+                    </a>
+                  </div>
+                </div>
+
+                <div>
+                  <h3 className="text-lg font-bold mb-6">Quick Links</h3>
+                  <ul className="space-y-3">
+                    <li><Link to="/" className="text-gray-400 hover:text-white">Home</Link></li>
+                    <li><Link to="/products" className="text-gray-400 hover:text-white">Products</Link></li>
+                    <li><Link to="/categories" className="text-gray-400 hover:text-white">Categories</Link></li>
+                    <li><Link to="/deals" className="text-gray-400 hover:text-white">Hot Deals</Link></li>
+                    <li><Link to="/about" className="text-gray-400 hover:text-white">About Us</Link></li>
+                  </ul>
+                </div>
+
+                <div>
+                  <h3 className="text-lg font-bold mb-6">Support</h3>
+                  <ul className="space-y-3">
+                    <li><Link to="/help" className="text-gray-400 hover:text-white">Help Center</Link></li>
+                    <li><Link to="/contact" className="text-gray-400 hover:text-white">Contact Us</Link></li>
+                    <li><Link to="/shipping" className="text-gray-400 hover:text-white">Shipping Info</Link></li>
+                    <li><Link to="/returns" className="text-gray-400 hover:text-white">Returns</Link></li>
+                    <li><Link to="/warranty" className="text-gray-400 hover:text-white">Warranty</Link></li>
+                  </ul>
+                </div>
+
+                <div>
+                  <h3 className="text-lg font-bold mb-6">Stay Updated</h3>
+                  <p className="text-gray-400 mb-4">Subscribe to our newsletter</p>
+                  <div className="flex">
+                    <input
+                      type="email"
+                      placeholder="Your email"
+                      className="flex-1 px-4 py-3 bg-gray-800 rounded-l-lg focus:outline-none"
+                    />
+                    <button className="px-4 py-3 bg-gradient-to-r from-blue-600 to-purple-600 rounded-r-lg">
+                      <FiChevronRight className="text-xl" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="border-t border-gray-800 mt-12 pt-8">
+                <div className="flex flex-col md:flex-row justify-between items-center">
+                  <p className="text-gray-400">© 2024 TechHub. All rights reserved.</p>
+                  <div className="flex space-x-6 mt-4 md:mt-0">
+                    <Link to="/privacy" className="text-gray-400 hover:text-white">Privacy Policy</Link>
+                    <Link to="/terms" className="text-gray-400 hover:text-white">Terms of Service</Link>
+                    <Link to="/cookies" className="text-gray-400 hover:text-white">Cookie Policy</Link>
+                  </div>
+                </div>
               </div>
             </div>
-          )}
-        </nav>
+          </footer>
 
-        {/* Main Content */}
-        <div className="container mx-auto px-4 py-8">
-          <Routes>
-            {/* Home Page */}
-            <Route path="/" element={
-              <div className="space-y-12">
-                {/* Hero Section */}
-                <section className="rounded-3xl overflow-hidden bg-gradient-to-r from-blue-900 via-purple-900 to-indigo-900 text-white">
-                  <div className="container mx-auto px-8 py-16">
-                    <div className="grid md:grid-cols-2 gap-12 items-center">
-                      <div>
-                        <h1 className="text-5xl font-bold mb-6">
-                          Discover the Future of <span className="bg-gradient-to-r from-cyan-400 to-blue-400 bg-clip-text text-transparent">Technology</span>
-                        </h1>
-                        <p className="text-xl text-gray-300 mb-8">
-                          Shop the latest tech gadgets, premium electronics, and innovative devices with exclusive deals and fast delivery.
-                        </p>
-                        <div className="flex flex-wrap gap-4">
-                          <Link to="/products" className="px-8 py-4 bg-white text-blue-900 rounded-full font-semibold hover:shadow-2xl transition-shadow">
-                            Shop Now
-                          </Link>
-                          <Link to="/deals" className="px-8 py-4 border-2 border-white text-white rounded-full font-semibold hover:bg-white hover:text-blue-900 transition-colors">
-                            View Deals
-                          </Link>
-                        </div>
-                      </div>
-                      <div className="relative">
-                        <div className="absolute -top-6 -right-6 w-64 h-64 bg-gradient-to-r from-cyan-500 to-blue-500 rounded-full mix-blend-multiply filter blur-3xl opacity-20"></div>
-                        <img 
-                          src="https://images.unsplash.com/photo-1498049794561-7780e7231661?w=800&auto=format&fit=crop" 
-                          alt="Tech Products"
-                          className="relative rounded-2xl shadow-2xl"
-                        />
-                      </div>
-                    </div>
-                  </div>
-                </section>
-
-                {/* Categories Section */}
-
-                <section>
-                  <div className="flex justify-between items-center mb-8">
-                    <h2 className="text-3xl font-bold text-gray-900">Shop by Category</h2>
-                    <Link to="/categories" className="text-blue-600 hover:text-blue-700 font-medium flex items-center">
-                      View All <FiChevronRight className="ml-1" />
-                    </Link>
-                  </div>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-                    {categories.map((category, index) => (
-                      <div 
-                        key={index}
-                        className="bg-white p-6 rounded-2xl shadow-lg hover:shadow-2xl transition-shadow cursor-pointer group"
-                        onClick={() => {
-  setSelectedCategory(category.name);
-  navigate('/categories');
-}}
-
-                      >
-                        <div className="text-3xl mb-4">{category.icon}</div>
-                        <h3 className="font-semibold text-gray-900 mb-2">{category.name}</h3>
-                        <p className="text-sm text-gray-500">{category.count} products</p>
-                        <div className="mt-4 h-1 w-0 group-hover:w-full bg-gradient-to-r from-blue-500 to-purple-500 transition-all duration-300"></div>
-                      </div>
-                    ))}
-                  </div>
-                </section>
-
-
-                
-                {/* Featured Products */}
-                <section>
-                  <div className="flex justify-between items-center mb-8">
-                    <h2 className="text-3xl font-bold text-gray-900">Featured Products</h2>
-                    <Link to="/products" className="text-blue-600 hover:text-blue-700 font-medium flex items-center">
-                      View All <FiChevronRight className="ml-1" />
-                    </Link>
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-                    {products.slice(0, 4).map(product => (
-                      <ProductCard 
-                        key={product.id}
-                        product={product}
-                        addToCart={addToCart}
-                        toggleWishlist={toggleWishlist}
-                        isInWishlist={wishlist.some(item => item.id === product.id)}
-                      />
-                    ))}
-                  </div>
-                </section>
-
-                {/* Features Section */}
-                <section className="grid md:grid-cols-3 gap-8">
-                  <div className="bg-white p-8 rounded-2xl shadow-lg text-center">
-                    <div className="inline-block p-4 bg-blue-100 rounded-full mb-4">
-                      <FiTruck className="text-3xl text-blue-600" />
-                    </div>
-                    <h3 className="text-xl font-bold mb-2">Free Shipping</h3>
-                    <p className="text-gray-600">Free delivery on orders over $100</p>
-                  </div>
-                  <div className="bg-white p-8 rounded-2xl shadow-lg text-center">
-                    <div className="inline-block p-4 bg-green-100 rounded-full mb-4">
-                      <FiShield className="text-3xl text-green-600" />
-                    </div>
-                    <h3 className="text-xl font-bold mb-2">2-Year Warranty</h3>
-                    <p className="text-gray-600">All products come with warranty</p>
-                  </div>
-                  <div className="bg-white p-8 rounded-2xl shadow-lg text-center">
-                    <div className="inline-block p-4 bg-purple-100 rounded-full mb-4">
-                      <FiCreditCard className="text-3xl text-purple-600" />
-                    </div>
-                    <h3 className="text-xl font-bold mb-2">Secure Payment</h3>
-                    <p className="text-gray-600">100% secure payment processing</p>
-                  </div>
-                </section>
-              </div>
-            } />
-
-            {/* Products Page */}
-            <Route path="/products" element={
-              <div className="space-y-8">
-                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                  <div>
-                    <h1 className="text-3xl font-bold text-gray-900">All Products</h1>
-                    <p className="text-gray-600">Discover our premium collection</p>
-                  </div>
-                  <div className="flex items-center space-x-4">
-                    <select 
-                      className="px-4 py-2 bg-white border rounded-lg"
-                      value={selectedCategory}
-                      onChange={(e) => setSelectedCategory(e.target.value)}
-                    >
-                      <option value="All">All Categories</option>
-                      {categories.map(cat => (
-                        <option key={cat.name} value={cat.name}>{cat.name}</option>
-                      ))}
-                    </select>
-                    <button className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
-                      <FiFilter className="inline mr-2" />
-                      Filter
-                    </button>
-                  </div>
-                </div>
-
-                {filteredProducts.length === 0 ? (
-                  <div className="text-center py-16">
-                    <div className="text-6xl mb-4">🔍</div>
-                    <h3 className="text-2xl font-bold text-gray-900 mb-2">No products found</h3>
-                    <p className="text-gray-600">Try adjusting your search or filter criteria</p>
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
-                    {filteredProducts.map(product => (
-                      <ProductCard 
-                        key={product.id}
-                        product={product}
-                        addToCart={addToCart}
-                        toggleWishlist={toggleWishlist}
-                        isInWishlist={wishlist.some(item => item.id === product.id)}
-                      />
-                    ))}
-                  </div>
-                )}
-              </div>
-            } />
-
-            {/* Cart Page */}
-            <Route path="/cart" element={
-              <div className="max-w-7xl mx-auto">
-                <h1 className="text-3xl font-bold text-gray-900 mb-8">Shopping Cart</h1>
-                
-                {cart.length === 0 ? (
-                  <EmptyCart />
-                ) : (
-                  <div className="grid lg:grid-cols-3 gap-8">
-                    {/* Cart Items */}
-                    <div className="lg:col-span-2 space-y-6">
-                      {cart.map(item => (
-                        <div key={item.id} className="bg-white rounded-2xl shadow-lg p-6">
-                          <div className="flex flex-col md:flex-row gap-6">
-                            <div className="w-full md:w-32 h-32 bg-gray-100 rounded-xl overflow-hidden">
-                              <img 
-                                src={item.image} 
-                                alt={item.name}
-                                className="w-full h-full object-cover"
-                              />
-                            </div>
-                            <div className="flex-1">
-                              <div className="flex justify-between">
-                                <div>
-                                  <h3 className="text-xl font-bold text-gray-900">{item.name}</h3>
-                                  <p className="text-gray-600 mt-1">{item.category}</p>
-                                </div>
-                                <button 
-                                  onClick={() => removeFromCart(item.id)}
-                                  className="text-red-500 hover:text-red-700"
-                                >
-                                  <FiTrash2 className="text-xl" />
-                                </button>
-                              </div>
-                              
-                              <div className="flex items-center justify-between mt-6">
-                                <div className="flex items-center space-x-4">
-                                  <div className="flex items-center space-x-3 bg-gray-100 rounded-full px-4 py-2">
-                                    <button 
-                                      onClick={() => updateQuantity(item.id, -1)}
-                                      className="p-1 hover:bg-gray-200 rounded-full"
-                                    >
-                                      <FiMinus />
-                                    </button>
-                                    <span className="font-semibold text-lg">{item.quantity}</span>
-                                    <button 
-                                      onClick={() => updateQuantity(item.id, 1)}
-                                      className="p-1 hover:bg-gray-200 rounded-full"
-                                    >
-                                      <FiPlus />
-                                    </button>
-                                  </div>
-                                  <div className="text-2xl font-bold text-gray-900">
-                                    ${(item.price * item.quantity).toFixed(2)}
-                                  </div>
-                                </div>
-                                <div className="text-right">
-                                  <div className="text-sm text-gray-500">Price per unit</div>
-                                  <div className="text-lg font-semibold">${item.price}</div>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-
-                      {/* Cart Actions */}
-                      <div className="flex justify-between">
-                        <Link to="/products" className="px-6 py-3 border-2 border-blue-600 text-blue-600 rounded-full hover:bg-blue-50">
-                          Continue Shopping
-                        </Link>
-                        <button 
-                          onClick={clearCart}
-                          className="px-6 py-3 text-red-600 hover:text-red-700"
-                        >
-                          Clear Cart
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Order Summary */}
-                    <div className="lg:col-span-1">
-                      <div className="bg-white rounded-2xl shadow-lg p-8 sticky top-8">
-                        <h2 className="text-2xl font-bold text-gray-900 mb-6">Order Summary</h2>
-                        
-                        <div className="space-y-4 mb-8">
-                          <div className="flex justify-between text-gray-600">
-                            <span>Subtotal ({cartItemCount} items)</span>
-                            <span>${cartTotal.toFixed(2)}</span>
-                          </div>
-                          <div className="flex justify-between text-gray-600">
-                            <span>Shipping</span>
-                            <span className="text-green-600">FREE</span>
-                          </div>
-                          <div className="flex justify-between text-gray-600">
-                            <span>Tax</span>
-                            <span>${(cartTotal * 0.08).toFixed(2)}</span>
-                          </div>
-                          <div className="border-t pt-4">
-                            <div className="flex justify-between text-2xl font-bold">
-                              <span>Total</span>
-                              <span className="text-blue-600">${(cartTotal * 1.08).toFixed(2)}</span>
-                            </div>
-                          </div>
-                        </div>
-
-                        <button
-                          onClick={checkout}
-                          className="w-full py-4 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-full font-semibold text-lg hover:shadow-xl transition-shadow"
-                        >
-                          Proceed to Checkout
-                        </button>
-
-                        <div className="mt-6 space-y-4">
-                          <div className="text-center text-gray-500">or pay with</div>
-                          <div className="flex justify-center space-x-4">
-                            <FaPaypal className="text-3xl text-blue-800 cursor-pointer" />
-                            <FaCcVisa className="text-3xl text-blue-600 cursor-pointer" />
-                            <FaCcMastercard className="text-3xl text-red-600 cursor-pointer" />
-                            <FaCcAmex className="text-3xl text-blue-900 cursor-pointer" />
-                          </div>
-                        </div>
-
-                        <div className="mt-8 space-y-3">
-                          <div className="flex items-center text-sm text-gray-600">
-                            <FiCheck className="text-green-500 mr-2" />
-                            Free returns within 30 days
-                          </div>
-                          <div className="flex items-center text-sm text-gray-600">
-                            <FiCheck className="text-green-500 mr-2" />
-                            Secure SSL encryption
-                          </div>
-                          <div className="flex items-center text-sm text-gray-600">
-                            <FiCheck className="text-green-500 mr-2" />
-                            24/7 customer support
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-            } />
-
-            {/* Login Page */}
-            <Route path="/login" element={
-              <div className="max-w-md mx-auto">
-                <div className="bg-white rounded-3xl shadow-2xl p-8">
-                  <div className="text-center mb-8">
-                    <div className="inline-block p-4 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full mb-4">
-                      <FiLogIn className="text-3xl text-white" />
-                    </div>
-                    <h2 className="text-3xl font-bold text-gray-900">Welcome Back</h2>
-                    <p className="text-gray-600 mt-2">Sign in to your account</p>
-                  </div>
-
-                  <form className="space-y-6">
-                    <div>
-                      <label className="block text-gray-700 mb-2">Email Address</label>
-                      <input
-                        type="email"
-                        className="w-full px-4 py-3 bg-gray-50 border rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        placeholder="Enter your email"
-                      />
-                    </div>
-                    
-                    <div>
-                      <label className="block text-gray-700 mb-2">Password</label>
-                      <input
-                        type="password"
-                        className="w-full px-4 py-3 bg-gray-50 border rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        placeholder="Enter your password"
-                      />
-                    </div>
-
-                    <div className="flex items-center justify-between">
-                      <label className="flex items-center">
-                        <input type="checkbox" className="rounded text-blue-600" />
-                        <span className="ml-2 text-gray-700">Remember me</span>
-                      </label>
-                      <Link to="/forgot-password" className="text-blue-600 hover:text-blue-700">
-                        Forgot password?
-                      </Link>
-                    </div>
-
-                    <button
-                      type="submit"
-                      className="w-full py-4 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-xl font-semibold text-lg hover:shadow-xl transition-shadow"
-                    >
-                      Sign In
-                    </button>
-
-                    <div className="relative text-center">
-                      <div className="absolute inset-0 flex items-center">
-                        <div className="w-full border-t border-gray-300"></div>
-                      </div>
-                      <div className="relative bg-white px-4 text-gray-500">or continue with</div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4">
-                      <button className="flex items-center justify-center space-x-2 px-4 py-3 border rounded-xl hover:bg-gray-50">
-                        <FaGoogle className="text-red-500" />
-                        <span>Google</span>
-                      </button>
-                      <button className="flex items-center justify-center space-x-2 px-4 py-3 border rounded-xl hover:bg-gray-50">
-                        <FaApple />
-                        <span>Apple</span>
-                      </button>
-                    </div>
-
-                    <p className="text-center text-gray-600">
-                      Don't have an account?{' '}
-                      <Link to="/register" className="text-blue-600 hover:text-blue-700 font-semibold">
-                        Sign up
-                      </Link>
-                    </p>
-                  </form>
-                </div>
-              </div>
-            } />
-
-            <Route
-  path="/categories"
-  element={
-    <CategoriesPage
-      categories={categories}
-      products={products}
-      selectedCategory={selectedCategory}
-      setSelectedCategory={setSelectedCategory}
-      filteredProducts={filteredProducts}
-      addToCart={addToCart}
-      toggleWishlist={toggleWishlist}
-      wishlist={wishlist}
-    />
-  }
-/>
-
-
-
-            {/* Register Page */}
-            <Route path="/register" element={
-              <div className="max-w-md mx-auto">
-                <div className="bg-white rounded-3xl shadow-2xl p-8">
-                  <div className="text-center mb-8">
-                    <div className="inline-block p-4 bg-gradient-to-r from-green-500 to-blue-500 rounded-full mb-4">
-                      <FiUserPlus className="text-3xl text-white" />
-                    </div>
-                    <h2 className="text-3xl font-bold text-gray-900">Create Account</h2>
-                    <p className="text-gray-600 mt-2">Join our tech community</p>
-                  </div>
-
-                  <form className="space-y-6">
-                    <div className="grid md:grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-gray-700 mb-2">First Name</label>
-                        <input
-                          type="text"
-                          className="w-full px-4 py-3 bg-gray-50 border rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
-                          placeholder="John"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-gray-700 mb-2">Last Name</label>
-                        <input
-                          type="text"
-                          className="w-full px-4 py-3 bg-gray-50 border rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
-                          placeholder="Doe"
-                        />
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="block text-gray-700 mb-2">Email Address</label>
-                      <input
-                        type="email"
-                        className="w-full px-4 py-3 bg-gray-50 border rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        placeholder="john@example.com"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-gray-700 mb-2">Password</label>
-                      <input
-                        type="password"
-                        className="w-full px-4 py-3 bg-gray-50 border rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        placeholder="Create a password"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="flex items-center">
-                        <input type="checkbox" className="rounded text-blue-600" />
-                        <span className="ml-2 text-gray-700">
-                          I agree to the Terms & Conditions
-                        </span>
-                      </label>
-                    </div>
-
-                    <button
-                      type="submit"
-                      className="w-full py-4 bg-gradient-to-r from-green-600 to-blue-600 text-white rounded-xl font-semibold text-lg hover:shadow-xl transition-shadow"
-                    >
-                      Create Account
-                    </button>
-
-                    <p className="text-center text-gray-600">
-                      Already have an account?{' '}
-                      <Link to="/login" className="text-blue-600 hover:text-blue-700 font-semibold">
-                        Sign in
-                      </Link>
-                    </p>
-                  </form>
-                </div>
-              </div>
-            } />
-          </Routes>
+          <ToastContainer
+            position="bottom-right"
+            autoClose={3000}
+            hideProgressBar={false}
+            newestOnTop
+            closeOnClick
+            rtl={false}
+            pauseOnFocusLoss
+            draggable
+            pauseOnHover
+            theme="colored"
+          />
         </div>
+      </AuthProvider>
+    </Router>
+  );
+}
 
-        {/* Footer */}
-        <footer className="bg-gray-900 text-white mt-16">
-          <div className="container mx-auto px-4 py-12">
-            <div className="grid md:grid-cols-2 lg:grid-cols-5 gap-8">
-              <div className="lg:col-span-2">
-                <Link to="/" className="flex items-center space-x-3 mb-6">
-                  <div className="bg-gradient-to-r from-blue-500 to-purple-500 p-2 rounded-xl">
-                    <FiShoppingBag className="text-white text-2xl" />
-                  </div>
-                  <div>
-                    <h1 className="text-2xl font-bold">TechHub</h1>
-                    <p className="text-gray-400">Premium Electronics Store</p>
-                  </div>
+// Home Page Component
+function HomePage({ categories, products, wishlist, addToCart, toggleWishlist, setSelectedCategory }) {
+  const navigate = useNavigate();
+
+  return (
+    <div className="space-y-12">
+      {/* Hero Section */}
+      <section className="rounded-3xl overflow-hidden bg-gradient-to-r from-blue-900 via-purple-900 to-indigo-900 text-white">
+        <div className="container mx-auto px-8 py-16">
+          <div className="grid md:grid-cols-2 gap-12 items-center">
+            <div>
+              <h1 className="text-5xl font-bold mb-6">
+                Discover the Future of <span className="bg-gradient-to-r from-cyan-400 to-blue-400 bg-clip-text text-transparent">Technology</span>
+              </h1>
+              <p className="text-xl text-gray-300 mb-8">
+                Shop the latest tech gadgets, premium electronics, and innovative devices with exclusive deals and fast delivery.
+              </p>
+              <div className="flex flex-wrap gap-4">
+                <Link to="/products" className="px-8 py-4 bg-white text-blue-900 rounded-full font-semibold hover:shadow-2xl transition-shadow">
+                  Shop Now
                 </Link>
-                <p className="text-gray-400 mb-6">
-                  Discover the latest tech gadgets and premium electronics with fast delivery and excellent customer service.
-                </p>
-                <div className="flex space-x-4">
-                  <a href="#" className="w-10 h-10 bg-gray-800 rounded-full flex items-center justify-center hover:bg-blue-600">
-                    <FaFacebook />
-                  </a>
-                  <a href="#" className="w-10 h-10 bg-gray-800 rounded-full flex items-center justify-center hover:bg-blue-400">
-                    <FaTwitter />
-                  </a>
-                  <a href="#" className="w-10 h-10 bg-gray-800 rounded-full flex items-center justify-center hover:bg-pink-600">
-                    <FaInstagram />
-                  </a>
-                  <a href="#" className="w-10 h-10 bg-gray-800 rounded-full flex items-center justify-center hover:bg-blue-700">
-                    <FaLinkedin />
-                  </a>
-                </div>
+                <Link to="/deals" className="px-8 py-4 border-2 border-white text-white rounded-full font-semibold hover:bg-white hover:text-blue-900 transition-colors">
+                  View Deals
+                </Link>
               </div>
+            </div>
+            <div className="relative">
+              <div className="absolute -top-6 -right-6 w-64 h-64 bg-gradient-to-r from-cyan-500 to-blue-500 rounded-full mix-blend-multiply filter blur-3xl opacity-20"></div>
+              <img
+                src="https://images.unsplash.com/photo-1498049794561-7780e7231661?w=800&auto=format&fit=crop"
+                alt="Tech Products"
+                className="relative rounded-2xl shadow-2xl"
+              />
+            </div>
+          </div>
+        </div>
+      </section>
 
-              <div>
-                <h3 className="text-lg font-bold mb-6">Quick Links</h3>
-                <ul className="space-y-3">
-                  <li><Link to="/" className="text-gray-400 hover:text-white">Home</Link></li>
-                  <li><Link to="/products" className="text-gray-400 hover:text-white">Products</Link></li>
-                  <li><Link to="/categories" className="text-gray-400 hover:text-white">Categories</Link></li>
-                  <li><Link to="/deals" className="text-gray-400 hover:text-white">Hot Deals</Link></li>
-                  <li><Link to="/about" className="text-gray-400 hover:text-white">About Us</Link></li>
-                </ul>
+      {/* Categories Section */}
+      <section>
+        <div className="flex justify-between items-center mb-8">
+          <h2 className="text-3xl font-bold text-gray-900">Shop by Category</h2>
+          <Link to="/categories" className="text-blue-600 hover:text-blue-700 font-medium flex items-center">
+            View All <FiChevronRight className="ml-1" />
+          </Link>
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+          {categories.map((category, index) => (
+            <div
+              key={index}
+              className="bg-white p-6 rounded-2xl shadow-lg hover:shadow-2xl transition-shadow cursor-pointer group"
+              onClick={() => {
+                setSelectedCategory(category.name);
+                navigate('/categories');
+              }}
+            >
+              <div className="text-3xl mb-4">{category.icon}</div>
+              <h3 className="font-semibold text-gray-900 mb-2">{category.name}</h3>
+              <p className="text-sm text-gray-500">{category.count} products</p>
+              <div className="mt-4 h-1 w-0 group-hover:w-full bg-gradient-to-r from-blue-500 to-purple-500 transition-all duration-300"></div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* Featured Products */}
+      <section>
+        <div className="flex justify-between items-center mb-8">
+          <h2 className="text-3xl font-bold text-gray-900">Featured Products</h2>
+          <Link to="/products" className="text-blue-600 hover:text-blue-700 font-medium flex items-center">
+            View All <FiChevronRight className="ml-1" />
+          </Link>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+          {products.slice(0, 4).map(product => (
+            <ProductCard
+              key={product.id}
+              product={product}
+              addToCart={addToCart}
+              toggleWishlist={toggleWishlist}
+              isInWishlist={wishlist.some(item => item.id === product.id)}
+            />
+          ))}
+        </div>
+      </section>
+
+      {/* Features Section */}
+      <section className="grid md:grid-cols-3 gap-8">
+        <div className="bg-white p-8 rounded-2xl shadow-lg text-center">
+          <div className="inline-block p-4 bg-blue-100 rounded-full mb-4">
+            <FiTruck className="text-3xl text-blue-600" />
+          </div>
+          <h3 className="text-xl font-bold mb-2">Free Shipping</h3>
+          <p className="text-gray-600">Free delivery on orders over $100</p>
+        </div>
+        <div className="bg-white p-8 rounded-2xl shadow-lg text-center">
+          <div className="inline-block p-4 bg-green-100 rounded-full mb-4">
+            <FiShield className="text-3xl text-green-600" />
+          </div>
+          <h3 className="text-xl font-bold mb-2">2-Year Warranty</h3>
+          <p className="text-gray-600">All products come with warranty</p>
+        </div>
+        <div className="bg-white p-8 rounded-2xl shadow-lg text-center">
+          <div className="inline-block p-4 bg-purple-100 rounded-full mb-4">
+            <FiCreditCard className="text-3xl text-purple-600" />
+          </div>
+          <h3 className="text-xl font-bold mb-2">Secure Payment</h3>
+          <p className="text-gray-600">100% secure payment processing</p>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+// Products Page Component
+function ProductsPage({ categories, selectedCategory, setSelectedCategory, filteredProducts, addToCart, toggleWishlist, wishlist, searchQuery, setSearchQuery }) {
+  return (
+    <div className="space-y-8">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">All Products</h1>
+          <p className="text-gray-600">Discover our premium collection</p>
+        </div>
+        <div className="flex items-center space-x-4">
+          <select
+            className="px-4 py-2 bg-white border rounded-lg"
+            value={selectedCategory}
+            onChange={(e) => setSelectedCategory(e.target.value)}
+          >
+            <option value="All">All Categories</option>
+            {categories.map(cat => (
+              <option key={cat.name} value={cat.name}>{cat.name}</option>
+            ))}
+          </select>
+          <button className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+            <FiFilter className="inline mr-2" />
+            Filter
+          </button>
+        </div>
+      </div>
+
+      {/* Search Bar for Products Page */}
+      <div className="max-w-2xl mx-auto">
+        <div className="relative">
+          <FiSearch className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400" />
+          <input
+            type="text"
+            placeholder="Search products by name or description..."
+            className="w-full pl-12 pr-4 py-3 bg-white border rounded-full focus:outline-none focus:ring-2 focus:ring-blue-500"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
+        </div>
+      </div>
+
+      {filteredProducts.length === 0 ? (
+        <div className="text-center py-16">
+          <div className="text-6xl mb-4">🔍</div>
+          <h3 className="text-2xl font-bold text-gray-900 mb-2">No products found</h3>
+          <p className="text-gray-600">Try adjusting your search or filter criteria</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
+          {filteredProducts.map(product => (
+            <ProductCard
+              key={product.id}
+              product={product}
+              addToCart={addToCart}
+              toggleWishlist={toggleWishlist}
+              isInWishlist={wishlist.some(item => item.id === product.id)}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Wishlist Page Component
+function WishlistPage({ wishlist, toggleWishlist, addToCart }) {
+  return (
+    <div className="max-w-7xl mx-auto">
+      <h1 className="text-3xl font-bold text-gray-900 mb-8">My Wishlist</h1>
+      
+      {wishlist.length === 0 ? (
+        <div className="text-center py-16">
+          <div className="inline-block p-8 bg-gradient-to-r from-pink-100 to-red-100 rounded-full mb-6">
+            <FiHeart className="text-6xl text-pink-400" />
+          </div>
+          <h3 className="text-2xl font-bold text-gray-900 mb-3">Your wishlist is empty</h3>
+          <p className="text-gray-600 mb-8 max-w-md mx-auto">
+            Save your favorite items here to purchase them later!
+          </p>
+          <Link
+            to="/products"
+            className="px-8 py-3 bg-gradient-to-r from-pink-600 to-red-600 text-white rounded-full font-semibold hover:shadow-xl transition-shadow"
+          >
+            Browse Products
+          </Link>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
+          {wishlist.map(product => (
+            <div key={product.id} className="bg-white rounded-2xl shadow-lg overflow-hidden">
+              <div className="relative">
+                <img
+                  src={product.image}
+                  alt={product.name}
+                  className="w-full h-64 object-cover"
+                />
+                <button
+                  onClick={() => toggleWishlist(product)}
+                  className="absolute top-4 right-4 p-2 bg-red-500 text-white rounded-full hover:bg-red-600"
+                >
+                  <FiHeart className="fill-current" />
+                </button>
               </div>
-
-              <div>
-                <h3 className="text-lg font-bold mb-6">Support</h3>
-                <ul className="space-y-3">
-                  <li><Link to="/help" className="text-gray-400 hover:text-white">Help Center</Link></li>
-                  <li><Link to="/contact" className="text-gray-400 hover:text-white">Contact Us</Link></li>
-                  <li><Link to="/shipping" className="text-gray-400 hover:text-white">Shipping Info</Link></li>
-                  <li><Link to="/returns" className="text-gray-400 hover:text-white">Returns</Link></li>
-                  <li><Link to="/warranty" className="text-gray-400 hover:text-white">Warranty</Link></li>
-                </ul>
-              </div>
-
-              <div>
-                <h3 className="text-lg font-bold mb-6">Stay Updated</h3>
-                <p className="text-gray-400 mb-4">Subscribe to our newsletter</p>
-                <div className="flex">
-                  <input
-                    type="email"
-                    placeholder="Your email"
-                    className="flex-1 px-4 py-3 bg-gray-800 rounded-l-lg focus:outline-none"
-                  />
-                  <button className="px-4 py-3 bg-gradient-to-r from-blue-600 to-purple-600 rounded-r-lg">
-                    <FiChevronRight className="text-xl" />
+              <div className="p-6">
+                <h3 className="text-lg font-bold text-gray-900 mb-2">{product.name}</h3>
+                <p className="text-gray-600 mb-4">{product.category}</p>
+                <div className="flex items-center justify-between">
+                  <div className="text-2xl font-bold text-gray-900">${product.price}</div>
+                  <button
+                    onClick={() => addToCart(product)}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-full hover:bg-blue-700"
+                  >
+                    Add to Cart
                   </button>
                 </div>
               </div>
             </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
-            <div className="border-t border-gray-800 mt-12 pt-8">
-              <div className="flex flex-col md:flex-row justify-between items-center">
-                <p className="text-gray-400">© 2024 TechHub. All rights reserved.</p>
-                <div className="flex space-x-6 mt-4 md:mt-0">
-                  <Link to="/privacy" className="text-gray-400 hover:text-white">Privacy Policy</Link>
-                  <Link to="/terms" className="text-gray-400 hover:text-white">Terms of Service</Link>
-                  <Link to="/cookies" className="text-gray-400 hover:text-white">Cookie Policy</Link>
+// Cart Page Component
+function CartPage({ cart, cartTotal, cartItemCount, removeFromCart, updateQuantity, clearCart, checkout, isAuthenticated }) {
+  return (
+    <div className="max-w-7xl mx-auto">
+      <h1 className="text-3xl font-bold text-gray-900 mb-8">Shopping Cart</h1>
+
+      {cart.length === 0 ? (
+        <EmptyCart />
+      ) : (
+        <div className="grid lg:grid-cols-3 gap-8">
+          {/* Cart Items */}
+          <div className="lg:col-span-2 space-y-6">
+            {cart.map(item => (
+              <div key={item.id} className="bg-white rounded-2xl shadow-lg p-6">
+                <div className="flex flex-col md:flex-row gap-6">
+                  <div className="w-full md:w-32 h-32 bg-gray-100 rounded-xl overflow-hidden">
+                    <img
+                      src={item.image}
+                      alt={item.name}
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex justify-between">
+                      <div>
+                        <h3 className="text-xl font-bold text-gray-900">{item.name}</h3>
+                        <p className="text-gray-600 mt-1">{item.category}</p>
+                      </div>
+                      <button
+                        onClick={() => removeFromCart(item.id)}
+                        className="text-red-500 hover:text-red-700"
+                      >
+                        <FiTrash2 className="text-xl" />
+                      </button>
+                    </div>
+
+                    <div className="flex items-center justify-between mt-6">
+                      <div className="flex items-center space-x-4">
+                        <div className="flex items-center space-x-3 bg-gray-100 rounded-full px-4 py-2">
+                          <button
+                            onClick={() => updateQuantity(item.id, -1)}
+                            className="p-1 hover:bg-gray-200 rounded-full"
+                          >
+                            <FiMinus />
+                          </button>
+                          <span className="font-semibold text-lg">{item.quantity}</span>
+                          <button
+                            onClick={() => updateQuantity(item.id, 1)}
+                            className="p-1 hover:bg-gray-200 rounded-full"
+                          >
+                            <FiPlus />
+                          </button>
+                        </div>
+                        <div className="text-2xl font-bold text-gray-900">
+                          ${(item.price * item.quantity).toFixed(2)}
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-sm text-gray-500">Price per unit</div>
+                        <div className="text-lg font-semibold">${item.price}</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+
+            {/* Cart Actions */}
+            <div className="flex justify-between">
+              <Link to="/products" className="px-6 py-3 border-2 border-blue-600 text-blue-600 rounded-full hover:bg-blue-50">
+                Continue Shopping
+              </Link>
+              <button
+                onClick={clearCart}
+                className="px-6 py-3 text-red-600 hover:text-red-700"
+              >
+                Clear Cart
+              </button>
+            </div>
+          </div>
+
+          {/* Order Summary */}
+          <div className="lg:col-span-1">
+            <div className="bg-white rounded-2xl shadow-lg p-8 sticky top-8">
+              <h2 className="text-2xl font-bold text-gray-900 mb-6">Order Summary</h2>
+
+              <div className="space-y-4 mb-8">
+                <div className="flex justify-between text-gray-600">
+                  <span>Subtotal ({cartItemCount} items)</span>
+                  <span>${cartTotal.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between text-gray-600">
+                  <span>Shipping</span>
+                  <span className="text-green-600">FREE</span>
+                </div>
+                <div className="flex justify-between text-gray-600">
+                  <span>Tax</span>
+                  <span>${(cartTotal * 0.08).toFixed(2)}</span>
+                </div>
+                <div className="border-t pt-4">
+                  <div className="flex justify-between text-2xl font-bold">
+                    <span>Total</span>
+                    <span className="text-blue-600">${(cartTotal * 1.08).toFixed(2)}</span>
+                  </div>
+                </div>
+              </div>
+
+              <button
+                onClick={checkout}
+                className="w-full py-4 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-full font-semibold text-lg hover:shadow-xl transition-shadow"
+              >
+                Proceed to Checkout
+              </button>
+
+              <div className="mt-6 space-y-4">
+                <div className="text-center text-gray-500">or pay with</div>
+                <div className="flex justify-center space-x-4">
+                  <FaPaypal className="text-3xl text-blue-800 cursor-pointer" />
+                  <FaCcVisa className="text-3xl text-blue-600 cursor-pointer" />
+                  <FaCcMastercard className="text-3xl text-red-600 cursor-pointer" />
+                  <FaCcAmex className="text-3xl text-blue-900 cursor-pointer" />
+                </div>
+              </div>
+
+              <div className="mt-8 space-y-3">
+                <div className="flex items-center text-sm text-gray-600">
+                  <FiCheck className="text-green-500 mr-2" />
+                  Free returns within 30 days
+                </div>
+                <div className="flex items-center text-sm text-gray-600">
+                  <FiCheck className="text-green-500 mr-2" />
+                  Secure SSL encryption
+                </div>
+                <div className="flex items-center text-sm text-gray-600">
+                  <FiCheck className="text-green-500 mr-2" />
+                  24/7 customer support
                 </div>
               </div>
             </div>
           </div>
-        </footer>
-
-        <ToastContainer 
-          position="bottom-right"
-          autoClose={3000}
-          hideProgressBar={false}
-          newestOnTop
-          closeOnClick
-          rtl={false}
-          pauseOnFocusLoss
-          draggable
-          pauseOnHover
-          theme="colored"
-        />
-      </div>
-    </Router>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -1013,19 +906,18 @@ function ProductCard({ product, addToCart, toggleWishlist, isInWishlist }) {
     <div className="group bg-white rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-300 overflow-hidden">
       {/* Product Image */}
       <div className="relative overflow-hidden">
-        <img 
-          src={product.image} 
+        <img
+          src={product.image}
           alt={product.name}
           className="w-full h-64 object-cover group-hover:scale-110 transition-transform duration-500"
         />
         <div className="absolute top-4 right-4 space-y-2">
-          <button 
+          <button
             onClick={() => toggleWishlist(product)}
-            className={`p-2 rounded-full backdrop-blur-sm ${
-              isInWishlist 
-                ? 'bg-red-500 text-white' 
+            className={`p-2 rounded-full backdrop-blur-sm ${isInWishlist
+                ? 'bg-red-500 text-white'
                 : 'bg-white/80 text-gray-700 hover:bg-red-500 hover:text-white'
-            } transition-colors`}
+              } transition-colors`}
           >
             <FiHeart className={isInWishlist ? 'fill-current' : ''} />
           </button>
@@ -1090,7 +982,7 @@ function ProductCard({ product, addToCart, toggleWishlist, isInWishlist }) {
 // Empty Cart Component
 function EmptyCart() {
   const navigate = useNavigate();
-  
+
   return (
     <div className="text-center py-16">
       <div className="inline-block p-8 bg-gradient-to-r from-blue-100 to-purple-100 rounded-full mb-6">
