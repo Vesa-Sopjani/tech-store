@@ -36,6 +36,3 @@ Thumbs.db
 
 # Vite cache
 .vite/
-# Node modules (everywhere)
-node_modules/
-**/node_modules/

@@ -302,42 +302,114 @@ const pool = mysql.createPool(dbConfig);
 const dbCircuitBreaker = new CircuitBreaker();
 
 // ==================== MIDDLEWARE SETUP ====================
-app.use(securityHeaders);
-app.use(cors());
+// ==================== MIDDLEWARE SETUP ====================
+// 1. Security headers
+// ==================== MIDDLEWARE SETUP ====================
+// 1. Helmet for security headers
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      scriptSrc: ["'self'"],
+      imgSrc: ["'self'", "data:", "https:"]
+    }
+  },
+  crossOriginEmbedderPolicy: false
+}));
+
+// 2. Cookie parser - IMPORTANT: MUST BE BEFORE CORS
+const cookieParser = require('cookie-parser');
+app.use(cookieParser());
+
+// 3. JSON parser
 app.use(express.json());
+
+
+// 4. CORS with specific configuration
+const corsOptions = {
+  origin: 'http://localhost:5173', // Your frontend URL
+  credentials: true, // Allow cookies/auth
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-API-Key', 'Accept', 'Origin', 'X-Requested-With']
+};
+app.use(cors(corsOptions));
+
+// 5. Rate limiting for categories endpoint
 app.use('/api/categories/', categoryLimiter);
 
 // ==================== AUTHENTICATION MIDDLEWARE ====================
+// category-service/app.js - Modifiko authenticateAdmin middleware
+
 const authenticateAdmin = async (req, res, next) => {
-  const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1];
-
-  if (!token) {
-    return res.status(401).json({
-      success: false,
-      message: 'Admin access token required'
-    });
-  }
-
   try {
-    const jwt = require('jsonwebtoken');
-    const JWT_SECRET = process.env.JWT_SECRET || 'your_jwt_secret';
+    console.log('🔐 Admin authentication requested');
+    console.log('Request URL:', req.url);
+    console.log('Request method:', req.method);
     
-    const decoded = jwt.verify(token, JWT_SECRET);
+    // Provo së pari me Authorization header
+    const authHeader = req.headers['authorization'];
+    console.log('Authorization header:', authHeader);
     
-    if (decoded.role !== 'admin') {
-      return res.status(403).json({
+    let token = null;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      token = authHeader.split(' ')[1];
+      console.log('Token extracted from header:', token ? 'Yes' : 'No');
+    }
+    
+    // Nëse nuk ka token, kthe error
+    if (!token) {
+      console.error('❌ No token provided in request');
+      return res.status(401).json({
         success: false,
-        message: 'Admin access required'
+        message: 'Admin access token required',
+        debug: {
+          headers: Object.keys(req.headers),
+          hasAuthHeader: !!authHeader
+        }
       });
     }
 
-    req.user = decoded;
-    next();
+    const jwt = require('jsonwebtoken');
+    const JWT_SECRET = process.env.JWT_SECRET || 'your_jwt_secret';
+    
+    console.log('JWT_SECRET exists:', !!JWT_SECRET);
+    
+    try {
+      const decoded = jwt.verify(token, JWT_SECRET);
+      console.log('✅ Token decoded successfully');
+      console.log('Decoded token data:', {
+        id: decoded.id,
+        username: decoded.username,
+        role: decoded.role,
+        exp: decoded.exp,
+        expiresIn: new Date(decoded.exp * 1000).toLocaleString()
+      });
+      
+      if (decoded.role !== 'admin') {
+        console.error('❌ User is not admin, role:', decoded.role);
+        return res.status(403).json({
+          success: false,
+          message: 'Admin access required'
+        });
+      }
+
+      req.user = decoded;
+      console.log('✅ Admin authentication successful');
+      next();
+    } catch (jwtError) {
+      console.error('❌ JWT verification error:', jwtError.message);
+      return res.status(403).json({
+        success: false,
+        message: 'Invalid or expired token',
+        error: jwtError.message
+      });
+    }
   } catch (err) {
+    console.error('❌ Admin auth error:', err);
     return res.status(403).json({
       success: false,
-      message: 'Invalid or expired token'
+      message: 'Authentication error'
     });
   }
 };
@@ -547,6 +619,8 @@ app.put('/api/categories/:id', authenticateAdmin, async (req, res) => {
     if (connection) connection.release();
   }
 });
+
+
 
 // Fshi kategori (admin - soft delete)
 app.delete('/api/categories/:id', authenticateAdmin, async (req, res) => {

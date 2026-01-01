@@ -7,9 +7,11 @@ import CategoriesPage from './components/CategoryPage';
 import Register from "./components/auth/Register";
 import { AuthProvider } from './contexts/AuthContext';
 import Login from "./components/auth/Login";
-import Header from './components/Header'; // ✅ KËTU ËSHTË HEADER-I YT
+import Header from './components/Header'; 
 import ProtectedRoute from './components/auth/ProtectedRoute';
-import Logout from "./components/auth/Logout"; // Shto këtë linjë
+import Logout from "./components/auth/Logout"; 
+import AdminDashboard from './components/AdminDashboard';
+import { useAuth } from './contexts/AuthContext'; 
 
 import {
   FiShoppingCart,
@@ -269,9 +271,21 @@ function App() {
     }
   };
 
+  const TestAuth = () => {
+  const auth = useAuth();
+  console.log('🧪 AuthContext test:', {
+    isAuthenticated: auth.isAuthenticated,
+    type: typeof auth.isAuthenticated,
+    user: auth.user,
+    loading: auth.loading
+  });
+  return null;
+};
+
   return (
     <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
       <AuthProvider>
+        <TestAuth />
         <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
           {/* Top Announcement Bar */}
           <div className="bg-gradient-to-r from-blue-600 to-purple-600 text-white py-2 px-4">
@@ -280,8 +294,6 @@ function App() {
             </div>
           </div>
 
-          {/* Custom Header me të gjitha elementet */}
-         {/* Custom Header me të gjitha elementet */}
           <Header 
             cartItemCount={cartItemCount} 
             wishlistCount={wishlist.length}
@@ -365,33 +377,11 @@ function App() {
               } />
 
               {/* Admin Dashboard */}
-              <Route path="/admin/dashboard" element={
-                <ProtectedRoute allowedRoles={['admin', 'administrator']}>
-                  <div className="max-w-6xl mx-auto">
-                    <h1 className="text-3xl font-bold mb-8">Admin Dashboard</h1>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                      <div className="bg-white rounded-2xl shadow-lg p-6">
-                        <h3 className="text-lg font-bold mb-4">Statistikat</h3>
-                        <p>Total Users: --</p>
-                        <p>Total Orders: --</p>
-                        <p>Revenue: --</p>
-                      </div>
-                      <div className="bg-white rounded-2xl shadow-lg p-6">
-                        <h3 className="text-lg font-bold mb-4">Menaxhimi</h3>
-                        <Link to="/admin/products" className="block py-2 hover:text-blue-600">
-                          Menaxho Produktet
-                        </Link>
-                        <Link to="/admin/users" className="block py-2 hover:text-blue-600">
-                          Menaxho Përdoruesit
-                        </Link>
-                        <Link to="/admin/orders" className="block py-2 hover:text-blue-600">
-                          Menaxho Porositë
-                        </Link>
-                      </div>
-                    </div>
-                  </div>
-                </ProtectedRoute>
-              } />
+<Route path="/admin/dashboard" element={
+  <ProtectedRoute allowedRoles={['admin', 'administrator']}>
+    <AdminDashboard /> 
+  </ProtectedRoute>
+} />
 
               {/* Cart Page */}
               <Route path="/cart" element={
