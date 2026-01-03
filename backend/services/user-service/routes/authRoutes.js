@@ -7,8 +7,8 @@ const { v4: uuidv4 } = require('uuid');
 const mysql = require('mysql2/promise');
 
 // Middleware
-const authenticateToken = require('../../../middlewares/authenticateToken');
-const attachAccessToken = require('../../../middlewares/attachAccessToken');
+const authenticateToken = require('../middlewares/authenticateToken');
+const attachAccessToken = require('../middlewares/attachAccessToken');
 
 // Database pool
 const pool = mysql.createPool({

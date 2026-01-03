@@ -18,7 +18,7 @@ const captchaRoutes = require('./routes/captcha');
 const authRoutes = require('./routes/authRoutes');
 
 // Import middlewares
-const authenticateToken = require('../../middlewares/authenticateToken');
+const authenticateToken = require('./middlewares/authenticateToken');
 
 // Services
 const kafkaService = require('./kafka-service');
@@ -362,7 +362,8 @@ const startServer = async () => {
   try {
     await initializeServices();
     
-    const startPort = parseInt(process.env.PORT) || 5003;
+    
+     const startPort = parseInt(process.env.PORT) || 5000;   
     
     const getAvailablePort = (port) => {
       return new Promise((resolve, reject) => {
