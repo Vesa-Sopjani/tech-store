@@ -422,16 +422,16 @@ function App() {
                     Discover the latest tech gadgets and premium electronics with fast delivery and excellent customer service.
                   </p>
                   <div className="flex space-x-4">
-                    <a href="#" className="w-10 h-10 bg-gray-800 rounded-full flex items-center justify-center hover:bg-blue-600">
+                    <a href="https://www.facebook.com/" target="_blank" className="w-10 h-10 bg-gray-800 rounded-full flex items-center justify-center hover:bg-blue-600">
                       <FaFacebook />
                     </a>
-                    <a href="#" className="w-10 h-10 bg-gray-800 rounded-full flex items-center justify-center hover:bg-blue-400">
+                    <a href="https://x.com/?lang=en" target="_blank" className="w-10 h-10 bg-gray-800 rounded-full flex items-center justify-center hover:bg-blue-400">
                       <FaTwitter />
                     </a>
-                    <a href="#" className="w-10 h-10 bg-gray-800 rounded-full flex items-center justify-center hover:bg-pink-600">
+                    <a href="https://www.instagram.com/" target="_blank" className="w-10 h-10 bg-gray-800 rounded-full flex items-center justify-center hover:bg-pink-600">
                       <FaInstagram />
                     </a>
-                    <a href="#" className="w-10 h-10 bg-gray-800 rounded-full flex items-center justify-center hover:bg-blue-700">
+                    <a href="https://www.linkedin.com/" target="_blank" className="w-10 h-10 bg-gray-800 rounded-full flex items-center justify-center hover:bg-blue-700">
                       <FaLinkedin />
                     </a>
                   </div>
@@ -443,19 +443,17 @@ function App() {
                     <li><Link to="/" className="text-gray-400 hover:text-white">Home</Link></li>
                     <li><Link to="/products" className="text-gray-400 hover:text-white">Products</Link></li>
                     <li><Link to="/categories" className="text-gray-400 hover:text-white">Categories</Link></li>
-                    <li><Link to="/deals" className="text-gray-400 hover:text-white">Hot Deals</Link></li>
-                    <li><Link to="/about" className="text-gray-400 hover:text-white">About Us</Link></li>
                   </ul>
                 </div>
 
                 <div>
                   <h3 className="text-lg font-bold mb-6">Support</h3>
                   <ul className="space-y-3">
-                    <li><Link to="/help" className="text-gray-400 hover:text-white">Help Center</Link></li>
-                    <li><Link to="/contact" className="text-gray-400 hover:text-white">Contact Us</Link></li>
-                    <li><Link to="/shipping" className="text-gray-400 hover:text-white">Shipping Info</Link></li>
-                    <li><Link to="/returns" className="text-gray-400 hover:text-white">Returns</Link></li>
-                    <li><Link to="/warranty" className="text-gray-400 hover:text-white">Warranty</Link></li>
+                    <li><Link to="#" className="text-gray-400 hover:text-white">Help Center</Link></li>
+                    <li><Link to="#" className="text-gray-400 hover:text-white">Contact Us</Link></li>
+                    <li><Link to="#" className="text-gray-400 hover:text-white">Shipping Info</Link></li>
+                    <li><Link to="#" className="text-gray-400 hover:text-white">Returns</Link></li>
+                    <li><Link to="#" className="text-gray-400 hover:text-white">Warranty</Link></li>
                   </ul>
                 </div>
 
@@ -479,9 +477,9 @@ function App() {
                 <div className="flex flex-col md:flex-row justify-between items-center">
                   <p className="text-gray-400">© 2024 TechHub. All rights reserved.</p>
                   <div className="flex space-x-6 mt-4 md:mt-0">
-                    <Link to="/privacy" className="text-gray-400 hover:text-white">Privacy Policy</Link>
-                    <Link to="/terms" className="text-gray-400 hover:text-white">Terms of Service</Link>
-                    <Link to="/cookies" className="text-gray-400 hover:text-white">Cookie Policy</Link>
+                    <Link to="#" className="text-gray-400 hover:text-white">Privacy Policy</Link>
+                    <Link to="#" className="text-gray-400 hover:text-white">Terms of Service</Link>
+                    <Link to="#" className="text-gray-400 hover:text-white">Cookie Policy</Link>
                   </div>
                 </div>
               </div>
@@ -527,9 +525,7 @@ function HomePage({ categories, products, wishlist, addToCart, toggleWishlist, s
                 <Link to="/products" className="px-8 py-4 bg-white text-blue-900 rounded-full font-semibold hover:shadow-2xl transition-shadow">
                   Shop Now
                 </Link>
-                <Link to="/deals" className="px-8 py-4 border-2 border-white text-white rounded-full font-semibold hover:bg-white hover:text-blue-900 transition-colors">
-                  View Deals
-                </Link>
+               
               </div>
             </div>
             <div className="relative">
