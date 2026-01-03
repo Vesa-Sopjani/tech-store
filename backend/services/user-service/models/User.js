@@ -1,4 +1,15 @@
-const pool = require('../dbConfig');
+const mysql = require('mysql2/promise');
+const pool = mysql.createPool({
+  host: process.env.DB_HOST || 'localhost',
+  user: process.env.DB_USER || 'root',
+  password: process.env.DB_PASSWORD || '',
+  database: process.env.DB_NAME || 'TechProductDB',
+  waitForConnections: true,
+  connectionLimit: 10,
+  queueLimit: 0
+});
+
+// Pjesa tjetër e kodit mbetet e njëjtë...
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { v4: uuidv4 } = require('uuid');
@@ -393,6 +404,313 @@ class User {
       updated_at: this.updated_at
     };
   }
+
+
+  // ==== ADMIN METHODS ====
+
+// Get all users (with pagination and filters)
+static async findAll({ page = 1, limit = 20, search = '', role = '', sortBy = 'created_at', sortOrder = 'DESC' } = {}) {
+  try {
+    const connection = await pool.getConnection();
+    
+    const offset = (page - 1) * limit;
+    let query = `
+      SELECT 
+        id, username, email, full_name, address, phone, role,
+        email_verified, failed_attempts, locked_until, last_login,
+        created_at, updated_at, is_deleted, deleted_at
+      FROM Users 
+      WHERE 1=1
+    `;
+    const queryParams = [];
+    
+    // Apply search filter
+    if (search) {
+      query += ` AND (username LIKE ? OR email LIKE ? OR full_name LIKE ?)`;
+      const searchTerm = `%${search}%`;
+      queryParams.push(searchTerm, searchTerm, searchTerm);
+    }
+    
+    // Apply role filter
+    if (role) {
+      query += ` AND role = ?`;
+      queryParams.push(role);
+    }
+    
+    // Filter out deleted users by default (admin can choose to see them)
+    query += ` AND is_deleted = 0`;
+    
+    // Get total count for pagination
+    const countQuery = query.replace('SELECT id, username, email, full_name, address, phone, role, email_verified, failed_attempts, locked_until, last_login, created_at, updated_at, is_deleted, deleted_at', 'SELECT COUNT(*) as total');
+    const [countRows] = await connection.execute(countQuery, queryParams);
+    const total = countRows[0].total;
+    
+    // Apply sorting and pagination
+    query += ` ORDER BY ${sortBy} ${sortOrder} LIMIT ? OFFSET ?`;
+    queryParams.push(limit, offset);
+    
+    const [rows] = await connection.execute(query, queryParams);
+    connection.release();
+    
+    // Calculate pagination info
+    const totalPages = Math.ceil(total / limit);
+    const hasNextPage = page < totalPages;
+    const hasPrevPage = page > 1;
+    
+    return {
+      users: rows.map(row => new User(row)),
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total,
+        totalPages,
+        hasNextPage,
+        hasPrevPage
+      }
+    };
+  } catch (error) {
+    console.error('Error finding all users:', error);
+    throw error;
+  }
+}
+
+// Get deleted users
+static async findDeleted({ page = 1, limit = 20 } = {}) {
+  try {
+    const connection = await pool.getConnection();
+    
+    const offset = (page - 1) * limit;
+    
+    const [rows] = await connection.execute(
+      `SELECT 
+        id, username, email, full_name, role,
+        created_at, deleted_at
+      FROM Users 
+      WHERE is_deleted = 1
+      ORDER BY deleted_at DESC 
+      LIMIT ? OFFSET ?`,
+      [limit, offset]
+    );
+    
+    // Get total count
+    const [countRows] = await connection.execute(
+      `SELECT COUNT(*) as total FROM Users WHERE is_deleted = 1`
+    );
+    
+    connection.release();
+    
+    const total = countRows[0].total;
+    const totalPages = Math.ceil(total / limit);
+    
+    return {
+      users: rows.map(row => new User(row)),
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total,
+        totalPages
+      }
+    };
+  } catch (error) {
+    console.error('Error finding deleted users:', error);
+    throw error;
+  }
+}
+
+// Force delete user (permanent)
+static async forceDelete(id) {
+  try {
+    const connection = await pool.getConnection();
+    
+    // First check if user exists
+    const [checkRows] = await connection.execute(
+      'SELECT id FROM Users WHERE id = ?',
+      [id]
+    );
+    
+    if (checkRows.length === 0) {
+      connection.release();
+      return { success: false, message: 'User not found' };
+    }
+    
+    // Delete user permanently
+    await connection.execute(
+      'DELETE FROM Users WHERE id = ?',
+      [id]
+    );
+    
+    connection.release();
+    
+    return { success: true, message: 'User permanently deleted' };
+  } catch (error) {
+    console.error('Error force deleting user:', error);
+    throw error;
+  }
+}
+
+// Restore soft-deleted user
+static async restore(id) {
+  try {
+    const connection = await pool.getConnection();
+    
+    const [result] = await connection.execute(
+      `UPDATE Users SET 
+        is_deleted = 0,
+        deleted_at = NULL,
+        username = SUBSTRING_INDEX(username, '_deleted_', 1),
+        email = SUBSTRING_INDEX(email, '_deleted_', 1)
+      WHERE id = ? AND is_deleted = 1`,
+      [id]
+    );
+    
+    connection.release();
+    
+    if (result.affectedRows === 0) {
+      return { success: false, message: 'User not found or not deleted' };
+    }
+    
+    return { success: true, message: 'User restored successfully' };
+  } catch (error) {
+    console.error('Error restoring user:', error);
+    throw error;
+  }
+}
+
+// Update user role (admin only)
+async updateRole(newRole, adminId) {
+  try {
+    const validRoles = ['customer', 'admin', 'moderator', 'staff'];
+    
+    if (!validRoles.includes(newRole)) {
+      return { success: false, message: 'Invalid role' };
+    }
+    
+    // Cannot change own role
+    if (this.id === adminId) {
+      return { success: false, message: 'Cannot change your own role' };
+    }
+    
+    const connection = await pool.getConnection();
+    
+    await connection.execute(
+      `UPDATE Users SET 
+        role = ?,
+        updated_at = CURRENT_TIMESTAMP,
+        updated_by = ?
+      WHERE id = ?`,
+      [newRole, adminId, this.id]
+    );
+    
+    connection.release();
+    
+    this.role = newRole;
+    
+    return { success: true, message: 'User role updated successfully' };
+  } catch (error) {
+    console.error('Error updating user role:', error);
+    throw error;
+  }
+}
+
+// Lock/unlock user account
+async toggleLock(locked = true, adminId) {
+  try {
+    const connection = await pool.getConnection();
+    
+    if (locked) {
+      // Lock account for 24 hours
+      const lockedUntil = new Date(Date.now() + 24 * 60 * 60 * 1000);
+      
+      await connection.execute(
+        `UPDATE Users SET 
+          locked_until = ?,
+          updated_at = CURRENT_TIMESTAMP,
+          updated_by = ?
+        WHERE id = ?`,
+        [lockedUntil, adminId, this.id]
+      );
+      
+      this.locked_until = lockedUntil;
+      
+      return { 
+        success: true, 
+        message: 'User account locked for 24 hours',
+        lockedUntil 
+      };
+    } else {
+      // Unlock account
+      await connection.execute(
+        `UPDATE Users SET 
+          locked_until = NULL,
+          failed_attempts = 0,
+          updated_at = CURRENT_TIMESTAMP,
+          updated_by = ?
+        WHERE id = ?`,
+        [adminId, this.id]
+      );
+      
+      this.locked_until = null;
+      this.failed_attempts = 0;
+      
+      return { success: true, message: 'User account unlocked' };
+    }
+  } catch (error) {
+    console.error('Error toggling user lock:', error);
+    throw error;
+  }
+}
+
+// Get user statistics
+static async getStatistics() {
+  try {
+    const connection = await pool.getConnection();
+    
+    // Get counts by role
+    const [roleStats] = await connection.execute(`
+      SELECT 
+        role,
+        COUNT(*) as count,
+        SUM(CASE WHEN email_verified = 1 THEN 1 ELSE 0 END) as verified_count,
+        SUM(CASE WHEN locked_until IS NOT NULL AND locked_until > NOW() THEN 1 ELSE 0 END) as locked_count
+      FROM Users 
+      WHERE is_deleted = 0
+      GROUP BY role
+    `);
+    
+    // Get total counts
+    const [totalStats] = await connection.execute(`
+      SELECT 
+        COUNT(*) as total_users,
+        SUM(CASE WHEN DATE(created_at) = CURDATE() THEN 1 ELSE 0 END) as today_registrations,
+        SUM(CASE WHEN last_login >= DATE_SUB(NOW(), INTERVAL 7 DAY) THEN 1 ELSE 0 END) as active_last_7_days
+      FROM Users 
+      WHERE is_deleted = 0
+    `);
+    
+    // Get registration trends (last 30 days)
+    const [trends] = await connection.execute(`
+      SELECT 
+        DATE(created_at) as date,
+        COUNT(*) as registrations
+      FROM Users 
+      WHERE created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)
+        AND is_deleted = 0
+      GROUP BY DATE(created_at)
+      ORDER BY date
+    `);
+    
+    connection.release();
+    
+    return {
+      roleStats,
+      totalStats: totalStats[0] || {},
+      trends
+    };
+  } catch (error) {
+    console.error('Error getting user statistics:', error);
+    throw error;
+  }
+}
 
   // Get full user data (for internal use)
   toJSON() {

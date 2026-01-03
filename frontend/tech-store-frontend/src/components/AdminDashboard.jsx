@@ -15,6 +15,7 @@ import Chart from 'chart.js/auto';
 import { format, subDays, subMonths } from 'date-fns';
 import { toast } from 'react-toastify';
 import CategoriesManagement from './CategoriesManagement';
+import UsersManagement from './UserManagement';
 
 const AdminDashboard = () => {
   const [loading, setLoading] = useState(true);
@@ -363,6 +364,9 @@ const AdminDashboard = () => {
           </div>
         );
       
+      case 'users':
+  return <UsersManagement />;
+      
       case 'audit':
         return (
           <div className="bg-white rounded-xl shadow-lg p-6">
@@ -505,56 +509,64 @@ const AdminDashboard = () => {
           
           {/* Navigation Menu */}
           <div className="mt-6 pt-4 border-t">
-            <nav className="flex flex-wrap items-center gap-2 md:gap-4">
-              <button 
-                onClick={() => setActiveTab('dashboard')}
-                className={`flex items-center px-3 py-2 rounded-lg transition-colors ${activeTab === 'dashboard' ? 'bg-blue-50 text-blue-700 border border-blue-200' : 'text-gray-700 hover:bg-gray-100'}`}
-              >
-                <MdDashboard className="mr-2" />
-                Dashboard
-              </button>
-              
-              <button 
-                onClick={() => setActiveTab('products')}
-                className={`flex items-center px-3 py-2 rounded-lg transition-colors ${activeTab === 'products' ? 'bg-purple-50 text-purple-700 border border-purple-200' : 'text-gray-700 hover:bg-gray-100'}`}
-              >
-                <FiPackage className="mr-2" />
-                Products
-              </button>
-              
-              <button 
-                onClick={() => setActiveTab('categories')}
-                className={`flex items-center px-3 py-2 rounded-lg transition-colors ${activeTab === 'categories' ? 'bg-indigo-50 text-indigo-700 border border-indigo-200' : 'text-gray-700 hover:bg-gray-100'}`}
-              >
-                <FiGrid className="mr-2" />
-                Categories
-              </button>
-              
-              <button 
-                onClick={() => setActiveTab('orders')}
-                className={`flex items-center px-3 py-2 rounded-lg transition-colors ${activeTab === 'orders' ? 'bg-green-50 text-green-700 border border-green-200' : 'text-gray-700 hover:bg-gray-100'}`}
-              >
-                <FiShoppingCart className="mr-2" />
-                Orders
-              </button>
-              
-              <button 
-                onClick={() => setActiveTab('audit')}
-                className={`flex items-center px-3 py-2 rounded-lg transition-colors ${activeTab === 'audit' ? 'bg-yellow-50 text-yellow-700 border border-yellow-200' : 'text-gray-700 hover:bg-gray-100'}`}
-              >
-                <FiFileText className="mr-2" />
-                Audit Logs
-              </button>
-              
-              <button 
-                onClick={() => setActiveTab('settings')}
-                className={`flex items-center px-3 py-2 rounded-lg transition-colors ${activeTab === 'settings' ? 'bg-gray-100 text-gray-900 border border-gray-300' : 'text-gray-700 hover:bg-gray-100'}`}
-              >
-                <FiSettings className="mr-2" />
-                Settings
-              </button>
-            </nav>
-          </div>
+  <nav className="flex flex-wrap items-center gap-2 md:gap-4">
+    <button 
+      onClick={() => setActiveTab('dashboard')}
+      className={`flex items-center px-3 py-2 rounded-lg transition-colors ${activeTab === 'dashboard' ? 'bg-blue-50 text-blue-700 border border-blue-200' : 'text-gray-700 hover:bg-gray-100'}`}
+    >
+      <MdDashboard className="mr-2" />
+      Dashboard
+    </button>
+    
+    <button 
+      onClick={() => setActiveTab('products')}
+      className={`flex items-center px-3 py-2 rounded-lg transition-colors ${activeTab === 'products' ? 'bg-purple-50 text-purple-700 border border-purple-200' : 'text-gray-700 hover:bg-gray-100'}`}
+    >
+      <FiPackage className="mr-2" />
+      Products
+    </button>
+    
+    <button 
+      onClick={() => setActiveTab('categories')}
+      className={`flex items-center px-3 py-2 rounded-lg transition-colors ${activeTab === 'categories' ? 'bg-indigo-50 text-indigo-700 border border-indigo-200' : 'text-gray-700 hover:bg-gray-100'}`}
+    >
+      <FiGrid className="mr-2" />
+      Categories
+    </button>
+    
+    <button 
+      onClick={() => setActiveTab('users')}
+      className={`flex items-center px-3 py-2 rounded-lg transition-colors ${activeTab === 'users' ? 'bg-red-50 text-red-700 border border-red-200' : 'text-gray-700 hover:bg-gray-100'}`}
+    >
+      <FiUsers className="mr-2" />
+      Users
+    </button>
+    
+    <button 
+      onClick={() => setActiveTab('orders')}
+      className={`flex items-center px-3 py-2 rounded-lg transition-colors ${activeTab === 'orders' ? 'bg-green-50 text-green-700 border border-green-200' : 'text-gray-700 hover:bg-gray-100'}`}
+    >
+      <FiShoppingCart className="mr-2" />
+      Orders
+    </button>
+    
+    <button 
+      onClick={() => setActiveTab('audit')}
+      className={`flex items-center px-3 py-2 rounded-lg transition-colors ${activeTab === 'audit' ? 'bg-yellow-50 text-yellow-700 border border-yellow-200' : 'text-gray-700 hover:bg-gray-100'}`}
+    >
+      <FiFileText className="mr-2" />
+      Audit Logs
+    </button>
+    
+    <button 
+      onClick={() => setActiveTab('settings')}
+      className={`flex items-center px-3 py-2 rounded-lg transition-colors ${activeTab === 'settings' ? 'bg-gray-100 text-gray-900 border border-gray-300' : 'text-gray-700 hover:bg-gray-100'}`}
+    >
+      <FiSettings className="mr-2" />
+      Settings
+    </button>
+  </nav>
+</div>
         </div>
       </div>
 

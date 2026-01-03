@@ -7,8 +7,8 @@ const { v4: uuidv4 } = require('uuid');
 const mysql = require('mysql2/promise');
 
 // Middleware
-const authenticateToken = require('../middlewares/authenticateToken');
-const attachAccessToken = require('../middlewares/attachAccessToken');
+const authenticateToken = require('../../../middlewares/authenticateToken');
+const attachAccessToken = require('../../../middlewares/attachAccessToken');
 
 // Database pool
 const pool = mysql.createPool({
@@ -469,6 +469,8 @@ router.get('/me', authenticateToken, async (req, res) => {
   }
 });
 
+
+
 /**
  * @route   GET /api/auth/validate
  * @desc    Validate if user is authenticated (për frontend)
@@ -481,5 +483,120 @@ router.get('/validate', authenticateToken, (req, res) => {
     user: req.user
   });
 });
+// Në fund të authRoutes.js, para module.exports, shtoni:
 
+/**
+ * @route   PUT /api/auth/profile
+ * @desc    Update current user profile
+ * @access  Private
+ */
+router.put('/profile', authenticateToken, async (req, res) => {
+  let connection;
+  try {
+    const userId = req.user.id;
+    const { full_name, address, phone, currentPassword, newPassword } = req.body;
+    
+    connection = await pool.getConnection();
+    
+    // Merr user-in aktual
+    const [userRows] = await connection.execute(
+      'SELECT * FROM Users WHERE id = ?',
+      [userId]
+    );
+    
+    if (userRows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+    
+    const user = userRows[0];
+    
+    // Update fields
+    const updateFields = [];
+    const updateValues = [];
+    
+    if (full_name !== undefined) {
+      updateFields.push('full_name = ?');
+      updateValues.push(full_name);
+    }
+    
+    if (address !== undefined) {
+      updateFields.push('address = ?');
+      updateValues.push(address);
+    }
+    
+    if (phone !== undefined) {
+      updateFields.push('phone = ?');
+      updateValues.push(phone);
+    }
+    
+    // Password change requires current password
+    if (newPassword) {
+      if (!currentPassword) {
+        return res.status(400).json({
+          success: false,
+          message: 'Current password is required to change password'
+        });
+      }
+      
+      const isMatch = await bcrypt.compare(currentPassword, user.password);
+      if (!isMatch) {
+        return res.status(401).json({
+          success: false,
+          message: 'Current password is incorrect'
+        });
+      }
+      
+      if (newPassword.length < 6) {
+        return res.status(400).json({
+          success: false,
+          message: 'New password must be at least 6 characters'
+        });
+      }
+      
+      const hashedPassword = await bcrypt.hash(newPassword, parseInt(process.env.BCRYPT_ROUNDS) || 12);
+      updateFields.push('password = ?');
+      updateValues.push(hashedPassword);
+    }
+    
+    if (updateFields.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'No fields to update'
+      });
+    }
+    
+    updateValues.push(userId);
+    
+    await connection.execute(
+      `UPDATE Users SET ${updateFields.join(', ')}, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+      updateValues
+    );
+    
+    // Merr të dhënat e përditësuara
+    const [updatedRows] = await connection.execute(
+      'SELECT id, username, email, full_name, address, phone, role FROM Users WHERE id = ?',
+      [userId]
+    );
+    
+    connection.release();
+    
+    res.json({
+      success: true,
+      message: 'Profile updated successfully',
+      user: updatedRows[0]
+    });
+    
+  } catch (error) {
+    console.error('❌ Profile update error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to update profile'
+    });
+  } finally {
+    if (connection) connection.release();
+  }
+});
 module.exports = router;
