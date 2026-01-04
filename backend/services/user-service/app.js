@@ -12,7 +12,6 @@ require('dotenv').config();
 const { v4: uuidv4 } = require('uuid');
 const promClient = require('prom-client');
 const cookieParser = require('cookie-parser');
-const promBundle = require('express-prom-bundle');
 
 // Import routes
 const captchaRoutes = require('./routes/captcha');
@@ -29,21 +28,6 @@ const CacheManager = require('./cacheManager');
 
 // ==================== PROMETHEUS CONFIGURATION ====================
 // Krijo middleware për metrika automatikisht
-const metricsMiddleware = promBundle({
-  includeMethod: true,
-  includePath: true,
-  includeStatusCode: true,
-  includeUp: true,
-  customLabels: { 
-    project: 'tech-store',
-    service: 'user-service'
-  },
-  promClient: {
-    collectDefaultMetrics: {
-      timeout: 1000
-    }
-  }
-});
 
 // Registry për custom metrics
 const register = new promClient.Registry();
@@ -124,7 +108,22 @@ app.use((req, res, next) => {
 });
 
 // 2. Prometheus metrics middleware (pas logging)
-app.use(metricsMiddleware);
+app.use((req, res, next) => {
+  const start = Date.now();
+  
+  res.on('finish', () => {
+    const duration = Date.now() - start;
+    
+    // Mat kohën e përgjigjes (nëse ke metrikën custom)
+    if (httpRequestDuration) {
+      httpRequestDuration
+        .labels(req.method, req.route?.path || req.path, res.statusCode.toString())
+        .observe(duration / 1000);
+    }
+  });
+  
+  next();
+});
 
 // 3. Helmet for security headers
 app.use(helmet({

@@ -1,3 +1,4 @@
+// backend/services/user-service/cacheManager.js
 const redis = require('redis');
 
 class CacheManager {

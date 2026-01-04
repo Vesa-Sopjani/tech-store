@@ -16,6 +16,7 @@ import { format, subDays, subMonths } from 'date-fns';
 import { toast } from 'react-toastify';
 import CategoriesManagement from './CategoriesManagement';
 import UsersManagement from './UserManagement';
+import ProductManagement from './ProductManagement'; 
 
 const AdminDashboard = () => {
   const [loading, setLoading] = useState(true);
@@ -348,21 +349,16 @@ const AdminDashboard = () => {
       case 'categories':
         return <CategoriesManagement />;
       
-      case 'products':
-        return (
-          <div className="bg-white rounded-xl shadow-lg p-6">
-            <h2 className="text-2xl font-bold text-gray-900 mb-6">Products Management</h2>
-            <p className="text-gray-600 mb-6">Coming soon...</p>
-          </div>
-        );
-      
-      case 'orders':
-        return (
-          <div className="bg-white rounded-xl shadow-lg p-6">
-            <h2 className="text-2xl font-bold text-gray-900 mb-6">Orders Management</h2>
-            <p className="text-gray-600 mb-6">Coming soon...</p>
-          </div>
-        );
+case 'products':
+  return <ProductManagement />; 
+
+case 'orders':
+  return (
+    <div className="bg-white rounded-xl shadow-lg p-6">
+      <h2 className="text-2xl font-bold text-gray-900 mb-6">Orders Management</h2>
+      <p className="text-gray-600 mb-6">Coming soon...</p>
+    </div>
+  );
       
       case 'users':
   return <UsersManagement />;
