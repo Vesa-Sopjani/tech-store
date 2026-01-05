@@ -10,7 +10,7 @@ import {
   FiHelpCircle
 } from 'react-icons/fi';
 
-const API_BASE = (import.meta.env.VITE_API_URL || 'http://localhost:5005').replace(/\/$/, '');
+const API_BASE = (import.meta.env.VITE_API_URL || 'http://localhost:5002').replace(/\/$/, '');
 
   
 

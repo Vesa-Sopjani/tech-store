@@ -12,6 +12,8 @@ import ProtectedRoute from './components/auth/ProtectedRoute';
 import Logout from "./components/auth/Logout"; 
 import AdminDashboard from './components/AdminDashboard';
 import { useAuth } from './contexts/AuthContext'; 
+import Profile from './components/Profile';
+import ContactUs from './components/ContactUs';
 
 import {
   FiShoppingCart,
@@ -355,14 +357,17 @@ function App() {
               {/* Profile Page */}
               <Route path="/profile" element={
                 <ProtectedRoute>
-                  <div className="max-w-4xl mx-auto">
-                    <h1 className="text-3xl font-bold mb-8">Profili Im</h1>
-                    <div className="bg-white rounded-2xl shadow-lg p-8">
-                      <p>Kjo është faqja e profilit. Shiko më vonë për më shumë detaje!</p>
-                    </div>
-                  </div>
+               <Profile/>
                 </ProtectedRoute>
               } />
+
+               {/* Contact Page */}
+              <Route path="/contactus" element={
+                <ProtectedRoute>
+               <ContactUs/>
+                </ProtectedRoute>
+              } />
+
 
               {/* Orders Page */}
               <Route path="/orders" element={
@@ -400,6 +405,11 @@ function App() {
               <Route path="/register" element={<Register />} />
               <Route path="/login" element={<Login />} />
               <Route path="/logout" element={<Logout />} /> {/* Shto këtë linjë */}
+              <Route path="/profile" element={
+  <ProtectedRoute>
+    <Profile />
+  </ProtectedRoute>
+} />
 
             </Routes>
           </div>
@@ -450,10 +460,8 @@ function App() {
                   <h3 className="text-lg font-bold mb-6">Support</h3>
                   <ul className="space-y-3">
                     <li><Link to="#" className="text-gray-400 hover:text-white">Help Center</Link></li>
-                    <li><Link to="#" className="text-gray-400 hover:text-white">Contact Us</Link></li>
-                    <li><Link to="#" className="text-gray-400 hover:text-white">Shipping Info</Link></li>
-                    <li><Link to="#" className="text-gray-400 hover:text-white">Returns</Link></li>
-                    <li><Link to="#" className="text-gray-400 hover:text-white">Warranty</Link></li>
+                    <li><Link to="/contactus" className="text-gray-400 hover:text-white">Contact Us</Link></li>
+                   
                   </ul>
                 </div>
 

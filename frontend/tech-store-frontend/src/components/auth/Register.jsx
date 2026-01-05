@@ -10,7 +10,7 @@ import {
 import { toast } from "react-toastify";
 import { useTelemetry } from "../../hooks/useTelemetry";
 import { validateDataQuality } from "../../services/validationService";
-import { oauth2Login } from "../../services/authService";
+//import { oauth2Login } from "../../services/authService";
 import { publishKafkaEvent } from "../../services/eventService";
 import { 
   generateCaptcha, 

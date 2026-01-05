@@ -21,7 +21,7 @@ const CategoriesManagement = () => {
     is_active: true
   });
 
-  const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5005';
+  const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5002';
   
   // Fetch all categories
   const fetchCategories = async () => {
