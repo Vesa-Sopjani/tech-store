@@ -16,11 +16,11 @@ COPY src/ ./src/
 RUN mkdir -p /app/logs
 
 # Expose port
-EXPOSE 3001
+EXPOSE 5002
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD node -e "require('http').get('http://localhost:3001/health', (r) => {if(r.statusCode !== 200) throw new Error()})"
+  CMD node -e "require('http').get('http://localhost:5002/health', (r) => {if(r.statusCode !== 200) throw new Error()})"
 
 # Start the service
 CMD ["node", "src/index.js"]

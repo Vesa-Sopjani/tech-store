@@ -1,16 +1,16 @@
-// frontend/components/AdminDashboard.jsx
+// frontend/src/components/AdminDashboard.jsx
 import React, { useState, useEffect } from 'react';
-import { FiUsers, FiPackage, FiShoppingCart, FiDollarSign, FiAlertCircle, FiTrendingUp, FiRefreshCw, FiGrid, FiSettings, FiFileText } from 'react-icons/fi';
+import { FiUsers, FiPackage, FiShoppingCart, FiDollarSign, FiAlertCircle, FiRefreshCw, FiGrid, FiSettings } from 'react-icons/fi';
 import { MdDashboard } from 'react-icons/md';
 import { Line, Bar, Pie } from 'react-chartjs-2';
-import Chart from 'chart.js/auto';
-import { format, subDays } from 'date-fns';
+import { format } from 'date-fns';
 import { toast } from 'react-toastify';
 import { fetchWithAuth } from '../services/authService';
 import { API_URL } from '../utils/constants';
 import CategoriesManagement from './CategoriesManagement';
 import UsersManagement from './UserManagement';
 import ProductManagement from './ProductManagement';
+import OrdersManagement from './OrdersManagement';
 
 // Register Chart.js components
 import {
@@ -372,6 +372,14 @@ const AdminDashboard = () => {
               </button>
               
               <button 
+                onClick={() => setActiveTab('orders')}
+                className={`flex items-center px-3 py-2 rounded-lg transition-colors ${activeTab === 'orders' ? 'bg-green-50 text-green-700 border border-green-200' : 'text-gray-700 hover:bg-gray-100'}`}
+              >
+                <FiShoppingCart className="mr-2" />
+                Orders
+              </button>
+              
+              <button 
                 onClick={() => setActiveTab('settings')}
                 className={`flex items-center px-3 py-2 rounded-lg transition-colors ${activeTab === 'settings' ? 'bg-gray-100 text-gray-900 border border-gray-300' : 'text-gray-700 hover:bg-gray-100'}`}
               >
@@ -594,6 +602,8 @@ const AdminDashboard = () => {
           <CategoriesManagement />
         ) : activeTab === 'users' ? (
           <UsersManagement />
+        ) : activeTab === 'orders' ? (
+          <OrdersManagement />
         ) : activeTab === 'settings' ? (
           <div className="bg-white rounded-xl shadow-lg p-6">
             <h2 className="text-2xl font-bold text-gray-900 mb-6">Settings</h2>
