@@ -1,5 +1,4 @@
 import React, { useEffect } from "react";
-import { quickSessionCheck } from "../../services/authService";
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { 
@@ -11,20 +10,16 @@ import { toast } from "react-toastify";
 import { useTelemetry } from "../../hooks/useTelemetry";
 import { 
   generateCaptcha, 
-  verifyCaptcha,
   createCaptchaDataUrl,
   generateFallbackCaptcha 
 } from "../../services/captchaService";
-import { validateDataQuality } from "../../services/validationService";
-import { publishKafkaEvent } from "../../services/eventService";
-import { login as authLogin, validateSession, getCurrentUser } from "../../services/authService"; // ✅ Ndrysho këtu
 import { API_URL } from "../../utils/constants";
-import { useAuth } from '../../contexts/AuthContext'; // Shto këtë import
+import { useAuth } from '../../contexts/AuthContext';
 
 const Login = () => {
   const navigate = useNavigate();
   const { startSpan, endSpan } = useTelemetry();
-    const { login: authContextLogin } = useAuth(); // ✅ Shto këtë
+  const { login: authContextLogin } = useAuth();
 
   const [formData, setFormData] = useState({
     identifier: "",
@@ -133,100 +128,98 @@ const Login = () => {
   };
 
   const handleSubmit = async (e) => {
-  e.preventDefault();
-  const span = startSpan("login_submit");
+    e.preventDefault();
+    const span = startSpan("login_submit");
 
-  // Validate form
-  if (!validateForm()) {
-    endSpan(span, "error");
-    return;
-  }
+    // Validate form
+    if (!validateForm()) {
+      endSpan(span, "error");
+      return;
+    }
 
-  setLoading(true);
+    setLoading(true);
 
-  try {
-    console.log('🔐 Attempting login with:', formData.identifier);
-    
-    // ✅ Përdor login nga AuthContext (jo direkt nga authService)
-    const user = await authContextLogin(formData.identifier, formData.password);
-    
-    console.log('✅ Login successful, user:', user);
-    
-    toast.success(
-      <div className="flex items-center">
-        <FiCheckCircle className="mr-2" />
-        U kyçet me sukses! Mirë se vini përsëri.
-      </div>
-    );
-
-    endSpan(span, "success");
-
-    // Reset form
-    setFormData({
-      identifier: "",
-      password: ""
-    });
-
-    // ✅ REDIREKTIMI
-    setTimeout(() => {
-      console.log('🔄 Redirecting user with role:', user.role);
+    try {
+      console.log('🔐 Attempting login with:', formData.identifier);
       
-      if (user.role === 'admin' || user.role === 'administrator') {
-        console.log('🚀 Redirecting to admin dashboard');
-        navigate("/admin/dashboard");
-      } else {
-        console.log('🏠 Redirecting to homepage');
-        navigate("/");
-      }
-    }, 1500);
-
-    }catch (err) {
-  console.error("❌ Login error:", err);
-  
-  const errorMessages = {
-    "Failed to fetch": "Nuk mund të lidhet me serverin. Kontrollo lidhjen tuaj me internet.",
-    "Invalid credentials": "Email/username ose fjalëkalim i gabuar",
-    "User not found": "Përdoruesi nuk ekziston",
-    "Account locked": "Llogaria është bllokuar përkohësisht",
-    "HTTP 401": "Kredenciale të pavlefshme",
-    "HTTP 429": "Shumë tentativa. Ju lutem prisni 15 minuta para se të provoni përsëri.",
-    "HTTP 500": "Gabim në server. Provo përsëri më vonë.",
-    "Session expired": "Session ka skaduar. Ju lutem kyçuni përsëri.",
-    "Too many login attempts": "Shumë tentativa të dështuara. Prisni 15 minuta."
-  };
-
-  let errorMessage = errorMessages[err.message] || err.message || "Gabim gjatë kyçjes";
-
-  // Nëse është 429, trego një mesazh më të qartë
-  if (err.message.includes('429') || err.message.includes('Too many')) {
-    errorMessage = "🛑 SHUMË TENTATIVA! Llogaria juaj është bllokuar përkohësisht për 15 minuta për shkak të tentativave të shumta të dështuara.";
-    
-    toast.error(
-      <div className="space-y-2">
+      // ✅ Përdor login nga AuthContext (jo direkt nga authService)
+      const user = await authContextLogin(formData.identifier, formData.password);
+      
+      console.log('✅ Login successful, user:', user);
+      
+      toast.success(
         <div className="flex items-center">
-          <FiAlertCircle className="mr-2" />
-          <span className="font-bold">Llogaria e Bllokuar</span>
+          <FiCheckCircle className="mr-2" />
+          U kyçet me sukses! Mirë se vini përsëri.
         </div>
-        <div className="text-sm pl-6">
-          <p>• Shumë tentativa të dështuara të kyçjes</p>
-          <p>• Bllokimi zgjat 15 minuta</p>
-          <p>• Kontaktoni administratorin nëse është gabim</p>
-        </div>
-      </div>,
-      { autoClose: 10000 }
-    );
-  } else {
-    // Gabime të tjera
-    toast.error(
-      <div className="flex items-center">
-        <FiAlertCircle className="mr-2" />
-        {errorMessage}
-      </div>
-    );
-  }
+      );
 
-  // ... rest of error handling
-}finally {
+      endSpan(span, "success");
+
+      // Reset form
+      setFormData({
+        identifier: "",
+        password: ""
+      });
+
+      // ✅ REDIREKTIMI
+      setTimeout(() => {
+        console.log('🔄 Redirecting user with role:', user.role);
+        
+        if (user.role === 'admin' || user.role === 'administrator') {
+          console.log('🚀 Redirecting to admin dashboard');
+          navigate("/admin/dashboard");
+        } else {
+          console.log('🏠 Redirecting to homepage');
+          navigate("/");
+        }
+      }, 1500);
+
+    } catch (err) {
+      console.error("❌ Login error:", err);
+      
+      const errorMessages = {
+        "Failed to fetch": "Nuk mund të lidhet me serverin. Kontrollo lidhjen tuaj me internet.",
+        "Invalid credentials": "Email/username ose fjalëkalim i gabuar",
+        "User not found": "Përdoruesi nuk ekziston",
+        "Account locked": "Llogaria është bllokuar përkohësisht",
+        "HTTP 401": "Kredenciale të pavlefshme",
+        "HTTP 429": "Shumë tentativa. Ju lutem prisni 15 minuta para se të provoni përsëri.",
+        "HTTP 500": "Gabim në server. Provo përsëri më vonë.",
+        "Session expired": "Session ka skaduar. Ju lutem kyçuni përsëri.",
+        "Too many login attempts": "Shumë tentativa të dështuara. Prisni 15 minuta."
+      };
+
+      let errorMessage = errorMessages[err.message] || err.message || "Gabim gjatë kyçjes";
+
+      // Nëse është 429, trego një mesazh më të qartë
+      if (err.message.includes('429') || err.message.includes('Too many')) {
+        errorMessage = "🛑 SHUMË TENTATIVA! Llogaria juaj është bllokuar përkohësisht për 15 minuta për shkak të tentativave të shumta të dështuara.";
+        
+        toast.error(
+          <div className="space-y-2">
+            <div className="flex items-center">
+              <FiAlertCircle className="mr-2" />
+              <span className="font-bold">Llogaria e Bllokuar</span>
+            </div>
+            <div className="text-sm pl-6">
+              <p>• Shumë tentativa të dështuara të kyçjes</p>
+              <p>• Bllokimi zgjat 15 minuta</p>
+              <p>• Kontaktoni administratorin nëse është gabim</p>
+            </div>
+          </div>,
+          { autoClose: 10000 }
+        );
+      } else {
+        // Gabime të tjera
+        toast.error(
+          <div className="flex items-center">
+            <FiAlertCircle className="mr-2" />
+            {errorMessage}
+          </div>
+        );
+      }
+    } finally {
       setLoading(false);
     }
   };
@@ -271,72 +264,39 @@ const Login = () => {
     }
   };
 
- // Në Login.jsx - në useEffect për kontrollin e sesionit
-useEffect(() => {
-  let isMounted = true;
-  let isChecking = false;
-  
-  const checkExistingSession = async () => {
-    // Nëse AuthContext tashmë po kontrollon, mos e bëj
-    if (isChecking || !isMounted) return;
+
+  useEffect(() => {
+    let isMounted = true;
     
-    isChecking = true;
-    
-    try {
-      console.log('🔍 Login.jsx: Checking existing session...');
-      
-      // Përdor quickSessionCheck në vend të validateSession
-      // Kjo është më e lehtë dhe nuk ka cooldown
-      const isValid = await quickSessionCheck();
-      
-      if (!isMounted) return;
-      
-      if (isValid) {
-        console.log('✅ Login.jsx: User already logged in');
-        
-        try {
-          // Merr profilin e përdoruesit
-          const profile = await getCurrentUser();
+    const checkQuickAuth = () => {
+      try {
+        const storedUser = localStorage.getItem('user');
+        if (storedUser) {
+          const user = JSON.parse(storedUser);
+          console.log('📦 Login: Found cached user, redirecting...');
           
-          if (!isMounted) return;
-          
-          // Ridrejto sipas rolit
-          if (profile && (profile.role === 'admin' || profile.role === 'administrator')) {
-            navigate("/admin/dashboard");
-          } else {
-            navigate("/");
-          }
-        } catch (profileError) {
-          console.warn('⚠️ Could not fetch user profile:', profileError);
-          // Nëse nuk mund të marrësh profilin, ridrejto në homepage
-          if (isMounted) {
-            navigate("/");
-          }
+          setTimeout(() => {
+            if (isMounted) {
+              if (user.role === 'admin' || user.role === 'administrator') {
+                navigate("/admin/dashboard");
+              } else {
+                navigate("/");
+              }
+            }
+          }, 300);
         }
-      } else {
-        console.log('ℹ️ Login.jsx: No active session found - showing login form');
-        // Nuk ka sesion, trego formën e login
+      } catch (error) {
+        console.log('ℹ️ Login: No cached user found');
       }
-    } catch (error) {
-      console.log('ℹ️ Login.jsx: Session check error:', error.message);
-      // Nëse ka error, trego formën e login
-    } finally {
-      if (isMounted) {
-        isChecking = false;
-      }
-    }
-  };
-  
-  // Shto një delay për të parandaluar race condition me AuthContext
-  const timer = setTimeout(() => {
-    checkExistingSession();
-  }, 500); // 500ms delay
-  
-  return () => {
-    isMounted = false;
-    clearTimeout(timer);
-  };
-}, [navigate]); // Kthehet në array bosh për të ekzekutuar vetëm një herë
+    };
+    
+    checkQuickAuth();
+    
+    return () => {
+      isMounted = false;
+    };
+  }, [navigate]);
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 py-8 px-4">
       <div className="max-w-2xl mx-auto">

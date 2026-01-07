@@ -350,13 +350,26 @@ export const fetchWithAuth = async (url, options = {}) => {
   }
 };
 
-// Get current user profile - ME ANTI-LOOP PROTECTION
-export const getCurrentUser = async () => {
+export const getCachedUser = () => {
   try {
-    // Nëse tashmë po bëhet një kontroll, mos e përsërit
-    if (userProfileCheckInProgress) {
-      console.log('⏳ User profile check already in progress, skipping...');
-      throw new Error('Profile check in progress');
+    const userData = localStorage.getItem('user');
+    return userData ? JSON.parse(userData) : null;
+  } catch (error) {
+    console.error('Error getting cached user:', error);
+    return null;
+  }
+};
+
+// Get current user profile - ME ANTI-LOOP PROTECTION
+export const getCurrentUser = async (forceRefresh = false) => {
+  try {
+    // Nëse nuk kërkohet refresh dhe ka cache, ktheje atë
+    if (!forceRefresh) {
+      const cachedUser = getCachedUser();
+      if (cachedUser) {
+        console.log('📦 Using cached user data');
+        return cachedUser;
+      }
     }
     
     userProfileCheckInProgress = true;
@@ -378,9 +391,13 @@ export const getCurrentUser = async () => {
     userProfileCheckInProgress = false;
     return null;
     
-  } catch (error) {
-    userProfileCheckInProgress = false;
-    console.error('❌ Get user error:', error);
+   } catch (error) {
+    // Nëse dështon, provo cache
+    const cachedUser = getCachedUser();
+    if (cachedUser) {
+      console.warn('⚠️ Using cached user due to error:', error.message);
+      return cachedUser;
+    }
     throw error;
   }
 };

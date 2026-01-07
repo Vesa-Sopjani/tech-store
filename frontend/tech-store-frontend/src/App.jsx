@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+ import React, { useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { ToastContainer, toast } from 'react-toastify';
@@ -10,10 +10,14 @@ import Login from "./components/auth/Login";
 import Header from './components/Header'; 
 import ProtectedRoute from './components/auth/ProtectedRoute';
 import Logout from "./components/auth/Logout"; 
-import AdminDashboard from './components/AdminDashboard';
+import Dashboard from './components/admin/Dashboard';
 import { useAuth } from './contexts/AuthContext'; 
 import Profile from './components/Profile';
 import ContactUs from './components/ContactUs';
+import AdminLayout from './components/admin/AdminLayout';
+import Orders from './components/admin/Orders'; // Import Orders, jo OrdersManagement
+import Users  from './components/admin/Users';
+import Products from './components/admin/Products';
 
 import {
   FiShoppingCart,
@@ -274,15 +278,15 @@ function App() {
   };
 
   const TestAuth = () => {
-  const auth = useAuth();
-  console.log('🧪 AuthContext test:', {
-    isAuthenticated: auth.isAuthenticated,
-    type: typeof auth.isAuthenticated,
-    user: auth.user,
-    loading: auth.loading
-  });
-  return null;
-};
+    const auth = useAuth();
+    console.log('🧪 AuthContext test:', {
+      isAuthenticated: auth.isAuthenticated,
+      type: typeof auth.isAuthenticated,
+      user: auth.user,
+      loading: auth.loading
+    });
+    return null;
+  };
 
   return (
     <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
@@ -357,19 +361,18 @@ function App() {
               {/* Profile Page */}
               <Route path="/profile" element={
                 <ProtectedRoute>
-               <Profile/>
+                  <Profile/>
                 </ProtectedRoute>
               } />
 
-               {/* Contact Page */}
+              {/* Contact Page */}
               <Route path="/contactus" element={
                 <ProtectedRoute>
-               <ContactUs/>
+                  <ContactUs/>
                 </ProtectedRoute>
               } />
 
-
-              {/* Orders Page */}
+              {/* Orders Page (user orders) */}
               <Route path="/orders" element={
                 <ProtectedRoute>
                   <div className="max-w-4xl mx-auto">
@@ -381,12 +384,24 @@ function App() {
                 </ProtectedRoute>
               } />
 
-              {/* Admin Dashboard */}
-<Route path="/admin/dashboard" element={
-  <ProtectedRoute allowedRoles={['admin', 'administrator']}>
-    <AdminDashboard /> 
-  </ProtectedRoute>
-} />
+              {/* Admin Routes - Përdor AdminLayout */}
+              <Route path="/admin" element={
+                <ProtectedRoute allowedRoles={['admin', 'administrator']}>
+                  <AdminLayout />
+                </ProtectedRoute>
+              }>
+                <Route index element={<Dashboard />} />
+                <Route path="dashboard" element={<Dashboard />} />
+                 <Route path="products" element={<Products />} />
+                <Route path="users" element={<Users />} /> 
+                <Route path="orders" element={<Orders />} /> {/* Përdor komponentin Orders */}
+                <Route path="settings" element={
+                  <div className="p-6">
+                    <h1 className="text-3xl font-bold mb-6">Settings</h1>
+                    <p>Settings page here</p>
+                  </div>
+                } />
+              </Route>
 
               {/* Cart Page */}
               <Route path="/cart" element={
@@ -404,13 +419,12 @@ function App() {
 
               <Route path="/register" element={<Register />} />
               <Route path="/login" element={<Login />} />
-              <Route path="/logout" element={<Logout />} /> {/* Shto këtë linjë */}
+              <Route path="/logout" element={<Logout />} />
               <Route path="/profile" element={
-  <ProtectedRoute>
-    <Profile />
-  </ProtectedRoute>
-} />
-
+                <ProtectedRoute>
+                  <Profile />
+                </ProtectedRoute>
+              } />
             </Routes>
           </div>
 
@@ -461,7 +475,6 @@ function App() {
                   <ul className="space-y-3">
                     <li><Link to="#" className="text-gray-400 hover:text-white">Help Center</Link></li>
                     <li><Link to="/contactus" className="text-gray-400 hover:text-white">Contact Us</Link></li>
-                   
                   </ul>
                 </div>
 
@@ -533,7 +546,6 @@ function HomePage({ categories, products, wishlist, addToCart, toggleWishlist, s
                 <Link to="/products" className="px-8 py-4 bg-white text-blue-900 rounded-full font-semibold hover:shadow-2xl transition-shadow">
                   Shop Now
                 </Link>
-               
               </div>
             </div>
             <div className="relative">
