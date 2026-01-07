@@ -1,4 +1,4 @@
- import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { ToastContainer, toast } from 'react-toastify';
@@ -15,7 +15,7 @@ import { useAuth } from './contexts/AuthContext';
 import Profile from './components/Profile';
 import ContactUs from './components/ContactUs';
 import AdminLayout from './components/admin/AdminLayout';
-import Orders from './components/admin/Orders'; // Import Orders, jo OrdersManagement
+import Orders from './components/admin/Orders';
 import Users  from './components/admin/Users';
 import Products from './components/admin/Products';
 
@@ -72,7 +72,7 @@ const api = axios.create({
   }
 });
 
-// Mock data for demonstration
+// Mock data për rastin kur API nuk funksionon
 const mockProducts = [
   {
     id: '1',
@@ -97,78 +97,6 @@ const mockProducts = [
     image: 'https://images.unsplash.com/photo-1610945265064-0e34e5519bbf?w=400&h=400&fit=crop',
     stock: 35,
     features: ['AI Features', 'S Pen', 'Nightography', 'Android 14']
-  },
-  {
-    id: '3',
-    name: 'MacBook Pro 16" M3 Max',
-    description: 'Supercharged by M3 Max chip for extreme performance',
-    price: 3499.99,
-    category: 'Laptops',
-    rating: 4.9,
-    reviews: 620,
-    image: 'https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w-400&h=400&fit=crop',
-    stock: 20,
-    features: ['M3 Max Chip', '40-core GPU', '96GB RAM', 'Liquid Retina XDR']
-  },
-  {
-    id: '4',
-    name: 'Sony WH-1000XM5',
-    description: 'Industry-leading noise cancellation headphones',
-    price: 399.99,
-    category: 'Audio',
-    rating: 4.8,
-    reviews: 2100,
-    image: 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=400&h=400&fit=crop',
-    stock: 100,
-    features: ['Noise Cancelling', '30hr Battery', 'Hi-Res Audio', 'Touch Controls']
-  },
-  {
-    id: '5',
-    name: 'DJI Mavic 3 Pro',
-    description: 'Tri-camera drone with 4/3 CMOS Hasselblad camera',
-    price: 2199.99,
-    category: 'Drones',
-    rating: 4.9,
-    reviews: 450,
-    image: 'https://images.unsplash.com/photo-1473968512647-3e447244af8f?w=400&h=400&fit=crop',
-    stock: 15,
-    features: ['4K/120fps', '46min Flight', '15km Range', 'Omnidirectional Sensing']
-  },
-  {
-    id: '6',
-    name: 'PlayStation 5 Pro',
-    description: 'Next-gen gaming console with 8K support',
-    price: 699.99,
-    category: 'Gaming',
-    rating: 4.7,
-    reviews: 3200,
-    image: 'https://images.unsplash.com/photo-1606144042614-b2417e99c4e3?w=400&h=400&fit=crop',
-    stock: 25,
-    features: ['8K Gaming', '120fps', 'Ray Tracing', '825GB SSD']
-  },
-  {
-    id: '7',
-    name: 'Apple Watch Series 9',
-    description: 'Smartwatch with advanced health monitoring',
-    price: 429.99,
-    category: 'Wearables',
-    rating: 4.6,
-    reviews: 1800,
-    image: 'https://images.unsplash.com/photo-1434493650001-5d43a6fea0c0?w=400&h=400&fit=crop',
-    stock: 75,
-    features: ['ECG App', 'Blood Oxygen', 'GPS', 'Always-On Retina']
-  },
-  {
-    id: '8',
-    name: 'Samsung 55" OLED TV',
-    description: '4K OLED Smart TV with Quantum Processor',
-    price: 1499.99,
-    category: 'TV & Home',
-    rating: 4.8,
-    reviews: 890,
-    image: 'https://images.unsplash.com/photo-1593359677879-a4bb92f829d1?w=400&h=400&fit=crop',
-    stock: 30,
-    features: ['OLED 4K', 'HDR10+', 'Smart TV', 'Game Mode']
   }
 ];
 
@@ -185,16 +113,66 @@ const categories = [
 
 // Main App Component
 function App() {
-  const [products, setProducts] = useState(mockProducts);
+  const [products, setProducts] = useState([]);
   const [cart, setCart] = useState([]);
   const [wishlist, setWishlist] = useState([]);
   const [orders, setOrders] = useState([]);
   const [user, setUser] = useState(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [apiError, setApiError] = useState(null);
+
+  // Funksioni për të marrë produktet nga API
+  const fetchProducts = async () => {
+    try {
+      setLoading(true);
+      console.log('🔄 Duke marrë produktet nga API...');
+      
+      const response = await axios.get('http://localhost:5001/api/products');
+      
+      if (response.data.success) {
+        // Konverto të dhënat nga API në formatin e kërkuar nga frontend
+        const formattedProducts = response.data.data.map(product => ({
+          id: product.id.toString(),
+          name: product.name,
+          description: product.description || 'Pa përshkrim',
+          price: parseFloat(product.price) || 0,
+          category: product.category_name || 'Pa kategori',
+          rating: 4.5,
+          reviews: 0,
+          image: product.image_url || 'https://via.placeholder.com/400x400?text=Pa+foto',
+          stock: product.stock_quantity || 0,
+          features: product.specifications ? Object.values(product.specifications).slice(0, 4) : []
+        }));
+        
+        setProducts(formattedProducts);
+        setApiError(null);
+        console.log(`✅ Marrë ${formattedProducts.length} produkte nga API`);
+      } else {
+        setApiError('Gabim në marrjen e produkteve nga API');
+        setProducts(mockProducts);
+      }
+    } catch (error) {
+      console.error('❌ Gabim në marrjen e produkteve:', error);
+      setApiError('Gabim në lidhjen me serverin e produkteve');
+      setProducts(mockProducts);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Merr produktet kur komponenti mount
+  useEffect(() => {
+    fetchProducts();
+    
+    // Rifresko çdo 30 sekonda për produkte të reja
+    const interval = setInterval(fetchProducts, 30000);
+    
+    return () => clearInterval(interval);
+  }, []);
 
   // Calculate cart total
   const cartTotal = cart.reduce((total, item) => total + (item.price * item.quantity), 0);
@@ -305,34 +283,82 @@ function App() {
             wishlistCount={wishlist.length}
           />
 
+          {/* Loading State */}
+          {loading && (
+            <div className="fixed inset-0 bg-white bg-opacity-80 flex items-center justify-center z-50">
+              <div className="text-center">
+                <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-600 mx-auto mb-4"></div>
+                <p className="text-lg font-semibold text-gray-700">Duke ngarkuar produktet...</p>
+              </div>
+            </div>
+          )}
+
+          {/* Error Message */}
+          {apiError && !loading && (
+            <div className="bg-yellow-50 border-l-4 border-yellow-500 p-4 mb-4 mx-4 rounded">
+              <div className="flex">
+                <div className="flex-shrink-0">
+                  <svg className="h-5 w-5 text-yellow-400" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                  </svg>
+                </div>
+                <div className="ml-3">
+                  <p className="text-sm text-yellow-700">
+                    {apiError}. Duke përdorur të dhëna të krijuara.
+                    <button 
+                      onClick={fetchProducts} 
+                      className="ml-2 text-yellow-700 font-semibold hover:text-yellow-800 underline"
+                    >
+                      Provoni përsëri
+                    </button>
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Main Content */}
           <div className="container mx-auto px-4 py-8">
             <Routes>
               {/* Home Page */}
               <Route path="/" element={
-                <HomePage 
-                  categories={categories}
-                  products={products}
-                  wishlist={wishlist}
-                  addToCart={addToCart}
-                  toggleWishlist={toggleWishlist}
-                  setSelectedCategory={setSelectedCategory}
-                />
+                loading ? (
+                  <div className="text-center py-16">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+                    <p className="text-gray-600">Duke ngarkuar produktet...</p>
+                  </div>
+                ) : (
+                  <HomePage 
+                    categories={categories}
+                    products={products}
+                    wishlist={wishlist}
+                    addToCart={addToCart}
+                    toggleWishlist={toggleWishlist}
+                    setSelectedCategory={setSelectedCategory}
+                  />
+                )
               } />
 
               {/* Products Page */}
               <Route path="/products" element={
-                <ProductsPage 
-                  categories={categories}
-                  selectedCategory={selectedCategory}
-                  setSelectedCategory={setSelectedCategory}
-                  filteredProducts={filteredProducts}
-                  addToCart={addToCart}
-                  toggleWishlist={toggleWishlist}
-                  wishlist={wishlist}
-                  searchQuery={searchQuery}
-                  setSearchQuery={setSearchQuery}
-                />
+                loading ? (
+                  <div className="text-center py-16">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+                    <p className="text-gray-600">Duke ngarkuar produktet...</p>
+                  </div>
+                ) : (
+                  <ProductsPage 
+                    categories={categories}
+                    selectedCategory={selectedCategory}
+                    setSelectedCategory={setSelectedCategory}
+                    filteredProducts={filteredProducts}
+                    addToCart={addToCart}
+                    toggleWishlist={toggleWishlist}
+                    wishlist={wishlist}
+                    searchQuery={searchQuery}
+                    setSearchQuery={setSearchQuery}
+                  />
+                )
               } />
 
               {/* Categories Page */}
@@ -394,7 +420,7 @@ function App() {
                 <Route path="dashboard" element={<Dashboard />} />
                  <Route path="products" element={<Products />} />
                 <Route path="users" element={<Users />} /> 
-                <Route path="orders" element={<Orders />} /> {/* Përdor komponentin Orders */}
+                <Route path="orders" element={<Orders />} />
                 <Route path="settings" element={
                   <div className="p-6">
                     <h1 className="text-3xl font-bold mb-6">Settings</h1>
@@ -525,7 +551,7 @@ function App() {
   );
 }
 
-// Home Page Component
+// Home Page Component - I NJËJTË SI MË PARË
 function HomePage({ categories, products, wishlist, addToCart, toggleWishlist, setSelectedCategory }) {
   const navigate = useNavigate();
 
@@ -636,7 +662,7 @@ function HomePage({ categories, products, wishlist, addToCart, toggleWishlist, s
   );
 }
 
-// Products Page Component
+// Products Page Component - I NJËJTË SI MË PARË
 function ProductsPage({ categories, selectedCategory, setSelectedCategory, filteredProducts, addToCart, toggleWishlist, wishlist, searchQuery, setSearchQuery }) {
   return (
     <div className="space-y-8">
@@ -700,7 +726,7 @@ function ProductsPage({ categories, selectedCategory, setSelectedCategory, filte
   );
 }
 
-// Wishlist Page Component
+// Wishlist Page Component - I NJËJTË SI MË PARË
 function WishlistPage({ wishlist, toggleWishlist, addToCart }) {
   return (
     <div className="max-w-7xl mx-auto">
@@ -760,7 +786,7 @@ function WishlistPage({ wishlist, toggleWishlist, addToCart }) {
   );
 }
 
-// Cart Page Component
+// Cart Page Component - I NJËJTË SI MË PARË
 function CartPage({ cart, cartTotal, cartItemCount, removeFromCart, updateQuantity, clearCart, checkout, isAuthenticated }) {
   return (
     <div className="max-w-7xl mx-auto">
@@ -906,7 +932,7 @@ function CartPage({ cart, cartTotal, cartItemCount, removeFromCart, updateQuanti
   );
 }
 
-// Product Card Component
+// Product Card Component - I NJËJTË SI MË PARË
 function ProductCard({ product, addToCart, toggleWishlist, isInWishlist }) {
   return (
     <div className="group bg-white rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-300 overflow-hidden">
@@ -985,7 +1011,7 @@ function ProductCard({ product, addToCart, toggleWishlist, isInWishlist }) {
   );
 }
 
-// Empty Cart Component
+// Empty Cart Component - I NJËJTË SI MË PARË
 function EmptyCart() {
   const navigate = useNavigate();
 
