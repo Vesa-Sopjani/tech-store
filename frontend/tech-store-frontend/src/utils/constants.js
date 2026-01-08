@@ -1,7 +1,7 @@
 // utils/constants.js
 
 // API URLs - Sigurohu që backend-i dhe frontend-i të kenë portet e duhura
-export const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+export const API_URL = import.meta.env.VITE_API_URL || 'http://backend:5000';
 export const FRONTEND_URL = import.meta.env.VITE_FRONTEND_URL || 'http://localhost:5173';
 
 // API Keys (vendosni në .env file në prodhim)

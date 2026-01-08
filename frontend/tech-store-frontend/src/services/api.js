@@ -1,50 +1,96 @@
-// services/api.js
-const API_BASE_URL = 'http://localhost:5001';
+// frontend/src/services/api.js
+import { fetchWithAuth } from './authService';
 
-export const apiRequest = async (endpoint, options = {}) => {
-  try {
-    console.log(`🌐 API Request: ${API_BASE_URL}${endpoint}`, options.method || 'GET');
-    
-    const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-      ...options,
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-        ...options.headers,
-      },
-    });
-    
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.message || `HTTP ${response.status}`);
-    }
-    
-    const data = await response.json();
-    return data;
-    
-  } catch (error) {
-    console.error('❌ API Error:', error);
-    throw error;
-  }
+const API_BASE = '/api';
+
+// Dashboard API calls
+export const dashboardAPI = {
+  getStats: () => fetchWithAuth(`${API_BASE}/admin/dashboard/stats`),
+  getRecentOrders: () => fetchWithAuth(`${API_BASE}/admin/orders/recent`),
+  getTopProducts: () => fetchWithAuth(`${API_BASE}/admin/products/top`),
+  getSalesData: (days) => fetchWithAuth(`${API_BASE}/admin/sales/last-${days}-days`),
+  getCategoryDistribution: () => fetchWithAuth(`${API_BASE}/admin/categories/distribution`)
 };
 
-// Products API
-export const productService = {
-  getAll: () => apiRequest('/api/products'),
-  create: (product) => apiRequest('/api/products', {
+// Products API calls
+export const productsAPI = {
+  getAll: (params = {}) => {
+    const query = new URLSearchParams(params).toString();
+    return fetchWithAuth(`${API_BASE}/admin/products${query ? `?${query}` : ''}`);
+  },
+  getById: (id) => fetchWithAuth(`${API_BASE}/admin/products/${id}`),
+  create: (data) => fetchWithAuth(`${API_BASE}/admin/products`, {
     method: 'POST',
-    body: JSON.stringify(product),
+    body: JSON.stringify(data)
   }),
-  update: (id, product) => apiRequest(`/api/products/${id}`, {
+  update: (id, data) => fetchWithAuth(`${API_BASE}/admin/products/${id}`, {
     method: 'PUT',
-    body: JSON.stringify(product),
+    body: JSON.stringify(data)
   }),
-  delete: (id) => apiRequest(`/api/products/${id}`, {
-    method: 'DELETE',
-  }),
+  delete: (id) => fetchWithAuth(`${API_BASE}/admin/products/${id}`, {
+    method: 'DELETE'
+  })
 };
 
-// Categories API
-export const categoryService = {
-  getAll: () => apiRequest('/api/categories'),
+// Categories API calls
+export const categoriesAPI = {
+  getAll: () => fetchWithAuth(`${API_BASE}/admin/categories`),
+  create: (data) => fetchWithAuth(`${API_BASE}/admin/categories`, {
+    method: 'POST',
+    body: JSON.stringify(data)
+  }),
+  update: (id, data) => fetchWithAuth(`${API_BASE}/admin/categories/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(data)
+  }),
+  delete: (id) => fetchWithAuth(`${API_BASE}/admin/categories/${id}`, {
+    method: 'DELETE'
+  })
+};
+
+// Users API calls
+export const usersAPI = {
+  getAll: (params = {}) => {
+    const query = new URLSearchParams(params).toString();
+    return fetchWithAuth(`${API_BASE}/admin/users${query ? `?${query}` : ''}`);
+  },
+  getStats: () => fetchWithAuth(`${API_BASE}/admin/users/stats`),
+  create: (data) => fetchWithAuth(`${API_BASE}/admin/users`, {
+    method: 'POST',
+    body: JSON.stringify(data)
+  }),
+  update: (id, data) => fetchWithAuth(`${API_BASE}/admin/users/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(data)
+  }),
+  delete: (id) => fetchWithAuth(`${API_BASE}/admin/users/${id}`, {
+    method: 'DELETE'
+  }),
+  lock: (id) => fetchWithAuth(`${API_BASE}/admin/users/${id}/lock`, {
+    method: 'POST'
+  }),
+  unlock: (id) => fetchWithAuth(`${API_BASE}/admin/users/${id}/unlock`, {
+    method: 'POST'
+  })
+};
+
+// Orders API calls
+export const ordersAPI = {
+  getAll: (params = {}) => {
+    const query = new URLSearchParams(params).toString();
+    return fetchWithAuth(`${API_BASE}/admin/orders${query ? `?${query}` : ''}`);
+  },
+  getById: (id) => fetchWithAuth(`${API_BASE}/admin/orders/${id}`),
+  getStats: () => fetchWithAuth(`${API_BASE}/admin/orders/stats`),
+  updateStatus: (id, status) => fetchWithAuth(`${API_BASE}/admin/orders/${id}/status`, {
+    method: 'PUT',
+    body: JSON.stringify({ status })
+  }),
+  updatePayment: (id, paymentStatus) => fetchWithAuth(`${API_BASE}/admin/orders/${id}/payment`, {
+    method: 'PUT',
+    body: JSON.stringify({ payment_status: paymentStatus })
+  }),
+  delete: (id) => fetchWithAuth(`${API_BASE}/admin/orders/${id}`, {
+    method: 'DELETE'
+  })
 };

@@ -58,9 +58,10 @@ export const AuthProvider = ({ children }) => {
       console.log('🔐 AuthContext login called with:', identifier);
       
       // ✅ Përdor authService.js për të bërë login në server
-      const userData = await authServiceLogin(identifier, password);
-      
-      console.log('✅ AuthContext login successful, user:', userData);
+       const userData = await authServiceLogin(identifier, password);
+    
+    console.log('✅ [AuthContext] login successful, user:', userData);
+    
       
       // ✅ Vendos user data në state
       setUser(userData);
