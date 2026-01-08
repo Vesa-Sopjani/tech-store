@@ -27,8 +27,6 @@ const authenticateToken = (req, res, next) => {
   
   let token = req.cookies?.accessToken;
 
-  console.log('Cookies available:', req.cookies);
-  console.log('Headers:', req.headers);
   if (!token && req.headers.authorization) {
     const authHeader = req.headers.authorization;
     if (authHeader && authHeader.startsWith('Bearer ')) {
@@ -50,7 +48,6 @@ const authenticateToken = (req, res, next) => {
     const jwt = require('jsonwebtoken');
     const JWT_SECRET = process.env.JWT_ACCESS_SECRET || process.env.JWT_SECRET;
     
-    console.log('Token length:', token.length);
     console.log('Using JWT_SECRET:', JWT_SECRET ? 'Present' : 'Missing');
     
     const decoded = jwt.verify(token, JWT_SECRET);
@@ -254,31 +251,6 @@ app.post('/api/orders', authenticateToken, async (req, res) => {
     }
   }
 });
-app.get('/api/orders/user/:user_id', authenticateToken, async (req, res) => {
-  try {
-    const { user_id } = req.params;
-    
-    const [orders] = await dbPool.query(
-      `SELECT o.*, 
-       (SELECT COUNT(*) FROM OrderItems WHERE order_id = o.id) as item_count
-       FROM Orders o 
-       WHERE o.user_id = ? 
-       ORDER BY o.created_at DESC`,
-      [user_id]
-    );
-    
-    res.json({
-      success: true,
-      data: orders
-    });
-  } catch (err) {
-    console.error('Get user orders error:', err);
-    res.status(500).json({
-      success: false,
-      message: 'Server error'
-    });
-  }
-});
 app.get('/api/orders', async (req, res) => {
   try {
     console.log('📦 Fetching orders...');
@@ -305,11 +277,15 @@ app.get('/api/orders', async (req, res) => {
     
     for (let order of orders) {
       try {
-        const [items] = await dbPool.query(
-          `SELECT oi.*, p.name as product_name 
-           FROM OrderItems oi 
-           JOIN Products p ON oi.product_id = p.id 
-           WHERE oi.order_id = ?`,
+        const [items] = await dbPool.query(`
+          SELECT oi.*, 
+            p.name as product_name,
+            p.image_url as product_image,
+            c.name as product_category
+          FROM OrderItems oi 
+          JOIN Products p ON oi.product_id = p.id
+          LEFT JOIN Categories c ON p.category_id = c.id
+          WHERE oi.order_id = ?`,
           [order.id]
         );
         order.items = items;
@@ -339,6 +315,128 @@ app.get('/api/orders', async (req, res) => {
     });
   }
 });
+app.get('/api/orders/user/:user_id', authenticateToken, async (req, res) => {
+  try {
+    const { user_id } = req.params;
+    
+    const [orders] = await dbPool.query(
+      `SELECT o.*, 
+       (SELECT COUNT(*) FROM OrderItems WHERE order_id = o.id) as item_count
+       FROM Orders o 
+       WHERE o.user_id = ? 
+       ORDER BY o.created_at DESC`,
+      [user_id]
+    );
+    
+    for (let order of orders) {
+      const [items] = await dbPool.query(`
+        SELECT oi.*,
+          p.name as product_name,
+          p.image_url as product_image,
+          c.name as product_category
+        FROM OrderItems oi
+        JOIN Products p ON oi.product_id = p.id
+        LEFT JOIN Categories c ON p.category_id = c.id
+        WHERE oi.order_id = ?`,
+        [order.id]
+      );
+      order.items = items;
+    }
+    
+    res.json({
+      success: true,
+      data: orders
+    });
+  } catch (err) {
+    console.error('Get user orders error:', err);
+    res.status(500).json({
+      success: false,
+      message: 'Server error'
+    });
+  }
+});
+// Cancel order (only within 3 days)
+app.put('/api/my-orders/:orderId/cancel', authenticateToken, async (req, res) => {
+  let connection;
+  try {
+    const userId = req.user.id;
+    const { orderId } = req.params;
+
+    connection = await dbPool.getConnection();
+    await connection.beginTransaction();
+
+    const [orderRows] = await connection.execute(
+      `SELECT id, status, created_at 
+       FROM Orders 
+       WHERE id = ? AND user_id = ?`,
+      [orderId, userId]
+    );
+
+    if (orderRows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Order not found or access denied'
+      });
+    }
+
+    const order = orderRows[0];
+
+    if (order.status !== 'pending') {
+      return res.status(400).json({
+        success: false,
+        message: 'Only pending orders can be cancelled'
+      });
+    }
+
+    const orderDate = new Date(order.created_at);
+    const now = new Date();
+    const diffInDays = (now - orderDate) / (1000 * 60 * 60 * 24);
+
+    if (diffInDays > 3) {
+      return res.status(400).json({
+        success: false,
+        message: 'Order can only be cancelled within 3 days of purchase'
+      });
+    }
+
+    const [items] = await connection.execute(
+      'SELECT product_id, quantity FROM OrderItems WHERE order_id = ?',
+      [orderId]
+    );
+
+    for (const item of items) {
+      await connection.execute(
+        'UPDATE Products SET stock_quantity = stock_quantity + ? WHERE id = ?',
+        [item.quantity, item.product_id]
+      );
+    }
+
+    await connection.execute(
+      `UPDATE Orders 
+       SET status = 'cancelled', updated_at = NOW() 
+       WHERE id = ?`,
+      [orderId]
+    );
+
+    await connection.commit();
+
+    res.json({
+      success: true,
+      message: 'Order cancelled successfully'
+    });
+
+  } catch (error) {
+    if (connection) await connection.rollback();
+    console.error('Cancel order error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to cancel order'
+    });
+  } finally {
+    if (connection) connection.release();
+  }
+});
+
 app.put('/api/users/:id/address', authenticateToken, async (req, res) => {
   let connection;
   try {
@@ -388,32 +486,39 @@ app.get('/api/my-orders', authenticateToken, async (req, res) => {
         o.payment_method,
         o.payment_status,
         o.shipping_address,
-        o.created_at,
-        COUNT(oi.id) as item_count,
-        SUM(oi.quantity) as total_items
+        o.created_at
       FROM Orders o
-      LEFT JOIN OrderItems oi ON o.id = oi.order_id
       WHERE o.user_id = ?
-      GROUP BY o.id
       ORDER BY o.created_at DESC
     `, [userId]);
     
-    // Get items for each order
+    console.log(`✅ Found ${orders.length} orders for user ${userId}`);
+    
     for (let order of orders) {
+      const [itemCountRows] = await dbPool.query(
+        'SELECT COUNT(*) as count, SUM(quantity) as total_items FROM OrderItems WHERE order_id = ?',
+        [order.id]
+      );
+      
+      order.item_count = itemCountRows[0]?.count || 0;
+      order.total_items = itemCountRows[0]?.total_items || 0;
+      
+      
       const [items] = await dbPool.query(`
         SELECT 
           oi.*,
           p.name as product_name,
           p.image_url as product_image,
-          p.category_name as product_category
+          p.description as product_description,
+          c.name as product_category
         FROM OrderItems oi
         LEFT JOIN Products p ON oi.product_id = p.id
+        LEFT JOIN Categories c ON p.category_id = c.id
         WHERE oi.order_id = ?
       `, [order.id]);
+      
       order.items = items;
     }
-    
-    console.log(`✅ Found ${orders.length} orders for user ${userId}`);
     
     res.json({
       success: true,
@@ -423,14 +528,15 @@ app.get('/api/my-orders', authenticateToken, async (req, res) => {
     
   } catch (err) {
     console.error('Get my orders error:', err);
+    console.error('Error stack:', err.stack);
     res.status(500).json({
       success: false,
-      message: 'Server error fetching orders'
+      message: 'Server error fetching orders',
+      error: process.env.NODE_ENV === 'development' ? err.message : undefined
     });
   }
 });
 
-// Get single order details (with authentication)
 app.get('/api/my-orders/:orderId', authenticateToken, async (req, res) => {
   try {
     const userId = req.user.id;
@@ -459,20 +565,27 @@ app.get('/api/my-orders/:orderId', authenticateToken, async (req, res) => {
     
     const order = orderRows[0];
     
-    // Get order items
     const [items] = await dbPool.query(`
       SELECT 
         oi.*,
         p.name as product_name,
         p.image_url as product_image,
         p.description as product_description,
-        p.category_name as product_category
+        c.name as product_category
       FROM OrderItems oi
       LEFT JOIN Products p ON oi.product_id = p.id
+      LEFT JOIN Categories c ON p.category_id = c.id
       WHERE oi.order_id = ?
     `, [orderId]);
     
     order.items = items;
+    
+    // Get item count
+    const [countRows] = await dbPool.query(
+      'SELECT COUNT(*) as item_count FROM OrderItems WHERE order_id = ?',
+      [orderId]
+    );
+    order.item_count = countRows[0]?.item_count || 0;
     
     res.json({
       success: true,
@@ -481,9 +594,11 @@ app.get('/api/my-orders/:orderId', authenticateToken, async (req, res) => {
     
   } catch (err) {
     console.error('Get order details error:', err);
+    console.error('Error stack:', err.stack);
     res.status(500).json({
       success: false,
-      message: 'Server error fetching order details'
+      message: 'Server error fetching order details',
+      error: process.env.NODE_ENV === 'development' ? err.message : undefined
     });
   }
 });
