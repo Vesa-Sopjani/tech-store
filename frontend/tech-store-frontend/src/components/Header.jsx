@@ -280,7 +280,7 @@ const Header = ({ cartItemCount = 0, wishlistCount = 0 }) => { // ✅ Shto wishl
                       </Link>
                       
                       <Link 
-                        to="/my-orders" 
+                        to="/orders" 
                         className="flex items-center space-x-3 px-4 py-3 hover:bg-purple-50 text-gray-700 transition-colors"
                         onClick={() => setIsDropdownOpen(false)}
                       >

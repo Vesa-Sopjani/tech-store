@@ -11,9 +11,12 @@ import { toast } from "react-toastify";
 import { useTelemetry } from "../../hooks/useTelemetry";
 import { 
   generateCaptcha, 
+  verifyCaptcha,
   createCaptchaDataUrl,
   generateFallbackCaptcha 
 } from "../../services/captchaService";
+import { validateDataQuality } from "../../services/validationService";
+import { publishKafkaEvent } from "../../services/eventService";
 import { API_URL } from "../../utils/constants";
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -141,12 +144,12 @@ const Login = () => {
     setLoading(true);
 
     try {
-      console.log('🔐 Attempting login with:', formData.identifier);
+      console.log('🔐 [Login.jsx] Attempting login with:', formData.identifier);
       
-      // ✅ Përdor login nga AuthContext (jo direkt nga authService)
+      // ✅ Përdor VETËM authContextLogin
       const user = await authContextLogin(formData.identifier, formData.password);
       
-      console.log('✅ Login successful, user:', user);
+      console.log('✅ [Login.jsx] Login successful, user:', user);
       
       toast.success(
         <div className="flex items-center">
@@ -177,7 +180,7 @@ const Login = () => {
       }, 1500);
 
     } catch (err) {
-      console.error("❌ Login error:", err);
+      console.error("❌ [Login.jsx] Login error:", err);
       
       const errorMessages = {
         "Failed to fetch": "Nuk mund të lidhet me serverin. Kontrollo lidhjen tuaj me internet.",
@@ -220,6 +223,8 @@ const Login = () => {
           </div>
         );
       }
+
+      endSpan(span, "error");
     } finally {
       setLoading(false);
     }
@@ -265,36 +270,60 @@ const Login = () => {
     }
   };
 
-
   useEffect(() => {
     let isMounted = true;
+    let isChecking = false;
     
-    const checkQuickAuth = () => {
+    const checkExistingSession = async () => {
+      if (isChecking || !isMounted) return;
+      
+      isChecking = true;
+      
       try {
-        const storedUser = localStorage.getItem('user');
-        if (storedUser) {
-          const user = JSON.parse(storedUser);
-          console.log('📦 Login: Found cached user, redirecting...');
+        console.log('🔍 Login.jsx: Checking existing session...');
+        
+        const isValid = await quickSessionCheck();
+        
+        if (!isMounted) return;
+        
+        if (isValid) {
+          console.log('✅ Login.jsx: User already logged in');
           
-          setTimeout(() => {
-            if (isMounted) {
-              if (user.role === 'admin' || user.role === 'administrator') {
-                navigate("/admin/dashboard");
-              } else {
-                navigate("/");
-              }
+          try {
+            const profile = await getCurrentUser();
+            
+            if (!isMounted) return;
+            
+            if (profile && (profile.role === 'admin' || profile.role === 'administrator')) {
+              navigate("/admin/dashboard");
+            } else {
+              navigate("/");
             }
-          }, 300);
+          } catch (profileError) {
+            console.warn('⚠️ Could not fetch user profile:', profileError);
+            if (isMounted) {
+              navigate("/");
+            }
+          }
+        } else {
+          console.log('ℹ️ Login.jsx: No active session found - showing login form');
         }
       } catch (error) {
-        console.log('ℹ️ Login: No cached user found');
+        console.log('ℹ️ Login.jsx: Session check error:', error.message);
+      } finally {
+        if (isMounted) {
+          isChecking = false;
+        }
       }
     };
     
-    checkQuickAuth();
+    const timer = setTimeout(() => {
+      checkExistingSession();
+    }, 500);
     
     return () => {
       isMounted = false;
+      clearTimeout(timer);
     };
   }, [navigate]);
 

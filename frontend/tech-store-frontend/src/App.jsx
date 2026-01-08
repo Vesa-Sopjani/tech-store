@@ -1,5 +1,4 @@
-App.jsx
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { ToastContainer, toast } from 'react-toastify';
@@ -8,20 +7,13 @@ import CategoriesPage from './components/CategoryPage';
 import Register from "./components/auth/Register";
 import { AuthProvider } from './contexts/AuthContext';
 import Login from "./components/auth/Login";
-import Header from './components/Header';
+import Header from './components/Header'; 
 import ProtectedRoute from './components/auth/ProtectedRoute';
-import Logout from "./components/auth/Logout";
-import Dashboard from './components/admin/Dashboard';
-import { useAuth } from './contexts/AuthContext';
+import Logout from "./components/auth/Logout"; 
+import AdminDashboard from './components/AdminDashboard';
+import { useAuth } from './contexts/AuthContext'; 
 import Profile from './components/Profile';
 import ContactUs from './components/ContactUs';
-import AdminLayout from './components/admin/AdminLayout';
-import Orders from './components/admin/Orders';
-import Users from './components/admin/Users';
-import Products from './components/admin/Products';
-import Cart from './components/Cart';
-import Checkout from './components/Checkout';
-import MyOrders from './components/MyOrders';
 
 import {
   FiShoppingCart,
@@ -49,8 +41,7 @@ import {
   FiBell,
   FiSettings,
   FiHelpCircle,
-  FiGrid,
-  FiArrowLeft
+  FiGrid
 } from 'react-icons/fi';
 
 import {
@@ -74,10 +65,10 @@ const api = axios.create({
   timeout: 10000,
   headers: {
     'Content-Type': 'application/json',
-  },
-  withCredentials: true 
+  }
 });
 
+// Mock data for demonstration
 const mockProducts = [
   {
     id: '1',
@@ -102,6 +93,78 @@ const mockProducts = [
     image: 'https://images.unsplash.com/photo-1610945265064-0e34e5519bbf?w=400&h=400&fit=crop',
     stock: 35,
     features: ['AI Features', 'S Pen', 'Nightography', 'Android 14']
+  },
+  {
+    id: '3',
+    name: 'MacBook Pro 16" M3 Max',
+    description: 'Supercharged by M3 Max chip for extreme performance',
+    price: 3499.99,
+    category: 'Laptops',
+    rating: 4.9,
+    reviews: 620,
+    image: 'https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w-400&h=400&fit=crop',
+    stock: 20,
+    features: ['M3 Max Chip', '40-core GPU', '96GB RAM', 'Liquid Retina XDR']
+  },
+  {
+    id: '4',
+    name: 'Sony WH-1000XM5',
+    description: 'Industry-leading noise cancellation headphones',
+    price: 399.99,
+    category: 'Audio',
+    rating: 4.8,
+    reviews: 2100,
+    image: 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=400&h=400&fit=crop',
+    stock: 100,
+    features: ['Noise Cancelling', '30hr Battery', 'Hi-Res Audio', 'Touch Controls']
+  },
+  {
+    id: '5',
+    name: 'DJI Mavic 3 Pro',
+    description: 'Tri-camera drone with 4/3 CMOS Hasselblad camera',
+    price: 2199.99,
+    category: 'Drones',
+    rating: 4.9,
+    reviews: 450,
+    image: 'https://images.unsplash.com/photo-1473968512647-3e447244af8f?w=400&h=400&fit=crop',
+    stock: 15,
+    features: ['4K/120fps', '46min Flight', '15km Range', 'Omnidirectional Sensing']
+  },
+  {
+    id: '6',
+    name: 'PlayStation 5 Pro',
+    description: 'Next-gen gaming console with 8K support',
+    price: 699.99,
+    category: 'Gaming',
+    rating: 4.7,
+    reviews: 3200,
+    image: 'https://images.unsplash.com/photo-1606144042614-b2417e99c4e3?w=400&h=400&fit=crop',
+    stock: 25,
+    features: ['8K Gaming', '120fps', 'Ray Tracing', '825GB SSD']
+  },
+  {
+    id: '7',
+    name: 'Apple Watch Series 9',
+    description: 'Smartwatch with advanced health monitoring',
+    price: 429.99,
+    category: 'Wearables',
+    rating: 4.6,
+    reviews: 1800,
+    image: 'https://images.unsplash.com/photo-1434493650001-5d43a6fea0c0?w=400&h=400&fit=crop',
+    stock: 75,
+    features: ['ECG App', 'Blood Oxygen', 'GPS', 'Always-On Retina']
+  },
+  {
+    id: '8',
+    name: 'Samsung 55" OLED TV',
+    description: '4K OLED Smart TV with Quantum Processor',
+    price: 1499.99,
+    category: 'TV & Home',
+    rating: 4.8,
+    reviews: 890,
+    image: 'https://images.unsplash.com/photo-1593359677879-a4bb92f829d1?w=400&h=400&fit=crop',
+    stock: 30,
+    features: ['OLED 4K', 'HDR10+', 'Smart TV', 'Game Mode']
   }
 ];
 
@@ -118,99 +181,22 @@ const categories = [
 
 // Main App Component
 function App() {
-  const [products, setProducts] = useState([]);
+  const [products, setProducts] = useState(mockProducts);
   const [cart, setCart] = useState([]);
   const [wishlist, setWishlist] = useState([]);
   const [orders, setOrders] = useState([]);
   const [user, setUser] = useState(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [apiError, setApiError] = useState(null);
-  const [cartItems, setCartItems] = useState([]);
-  const [cartTotal, setCartTotal] = useState(0);
 
-  useEffect(() => {
-    const total = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-    setCartTotal(total);
-    setCartItems(cart);
-  }, [cart]);
-
-  const removeFromCart = (productId) => {
-    setCart(cart.filter(item => item.id !== productId));
-    toast.info('Item removed from cart');
-  };
-
-  const updateCartQuantity = (productId, newQuantity) => {
-    setCart(cart.map(item =>
-      item.id === productId && newQuantity > 0
-        ? { ...item, quantity: newQuantity }
-        : item
-    ));
-  };
-const getDefaultImage = () => {
-  const svgString = `
-    <svg xmlns="http://www.w3.org/2000/svg" width="400" height="400" viewBox="0 0 400 400">
-      <rect width="400" height="400" fill="#f3f4f6"/>
-      <circle cx="200" cy="150" r="60" fill="#d1d5db"/>
-      <rect x="80" y="230" width="240" height="100" rx="10" fill="#d1d5db"/>
-      <text x="200" y="280" font-family="Arial, sans-serif" font-size="16" fill="#6b7280" 
-            text-anchor="middle" dy=".3em">Product</text>
-    </svg>
-  `;
-  return `data:image/svg+xml;base64,${btoa(svgString)}`;
-};
-
-  const fetchProducts = async () => {
-    try {
-      setLoading(true);
-      console.log('🔄 Duke marrë produktet nga API...');
-
-      const response = await axios.get('http://localhost:5001/api/products');
-
-      if (response.data.success) {
-       const formattedProducts = response.data.data.map(product => ({
-  id: product.id.toString(),
-  name: product.name,
-  description: product.description || 'Pa përshkrim',
-  price: parseFloat(product.price) || 0,
-  category: product.category_name || 'Pa kategori',
-  rating: 4.5,
-  reviews: 0,
-  image: product.image_url || getDefaultImage(),
-  stock: product.stock_quantity || 0,
-  features: product.specifications ? Object.values(product.specifications).slice(0, 4) : []
-}));
-
-        setProducts(formattedProducts);
-        setApiError(null);
-        console.log(`✅ Marrë ${formattedProducts.length} produkte nga API`);
-      } else {
-        setApiError('Gabim në marrjen e produkteve nga API');
-        setProducts(mockProducts);
-      }
-    } catch (error) {
-      console.error('❌ Gabim në marrjen e produkteve:', error);
-      setApiError('Gabim në lidhjen me serverin e produkteve');
-      setProducts(mockProducts);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchProducts();
-
-    const interval = setInterval(fetchProducts, 30000);
-
-    return () => clearInterval(interval);
-  }, []);
-
-  const cartTotalCalc = cart.reduce((total, item) => total + (item.price * item.quantity), 0);
+  // Calculate cart total
+  const cartTotal = cart.reduce((total, item) => total + (item.price * item.quantity), 0);
   const cartItemCount = cart.reduce((count, item) => count + item.quantity, 0);
 
+  // Filter products based on search and category
   const filteredProducts = products.filter(product => {
     const matchesSearch = product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       product.description.toLowerCase().includes(searchQuery.toLowerCase());
@@ -233,6 +219,12 @@ const getDefaultImage = () => {
       setCart([...cart, { ...product, quantity: 1 }]);
       toast.success(`${product.name} added to cart!`);
     }
+  };
+
+  // Remove from cart
+  const removeFromCart = (productId) => {
+    setCart(cart.filter(item => item.id !== productId));
+    toast.info('Item removed from cart');
   };
 
   // Update quantity
@@ -282,15 +274,15 @@ const getDefaultImage = () => {
   };
 
   const TestAuth = () => {
-    const auth = useAuth();
-    console.log('🧪 AuthContext test:', {
-      isAuthenticated: auth.isAuthenticated,
-      type: typeof auth.isAuthenticated,
-      user: auth.user,
-      loading: auth.loading
-    });
-    return null;
-  };
+  const auth = useAuth();
+  console.log('🧪 AuthContext test:', {
+    isAuthenticated: auth.isAuthenticated,
+    type: typeof auth.isAuthenticated,
+    user: auth.user,
+    loading: auth.loading
+  });
+  return null;
+};
 
   return (
     <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
@@ -304,93 +296,38 @@ const getDefaultImage = () => {
             </div>
           </div>
 
-          <Header
-            cartItemCount={cartItemCount}
+          <Header 
+            cartItemCount={cartItemCount} 
             wishlistCount={wishlist.length}
           />
-
-          {/* Loading State */}
-          {loading && (
-            <div className="fixed inset-0 bg-white bg-opacity-80 flex items-center justify-center z-50">
-              <div className="text-center">
-                <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-600 mx-auto mb-4"></div>
-                <p className="text-lg font-semibold text-gray-700">Duke ngarkuar produktet...</p>
-              </div>
-            </div>
-          )}
-
-          {/* Error Message */}
-          {apiError && !loading && (
-            <div className="bg-yellow-50 border-l-4 border-yellow-500 p-4 mb-4 mx-4 rounded">
-              <div className="flex">
-                <div className="flex-shrink-0">
-                  <svg className="h-5 w-5 text-yellow-400" viewBox="0 0 20 20" fill="currentColor">
-                    <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                  </svg>
-                </div>
-                <div className="ml-3">
-                  <p className="text-sm text-yellow-700">
-                    {apiError}. Duke përdorur të dhëna të krijuara.
-                    <button
-                      onClick={fetchProducts}
-                      className="ml-2 text-yellow-700 font-semibold hover:text-yellow-800 underline"
-                    >
-                      Provoni përsëri
-                    </button>
-                  </p>
-                </div>
-              </div>
-            </div>
-          )}
 
           {/* Main Content */}
           <div className="container mx-auto px-4 py-8">
             <Routes>
               {/* Home Page */}
               <Route path="/" element={
-                loading ? (
-                  <div className="text-center py-16">
-                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-                    <p className="text-gray-600">Duke ngarkuar produktet...</p>
-                  </div>
-                ) : (
-                  <HomePage
-                    categories={categories}
-                    products={products}
-                    wishlist={wishlist}
-                    addToCart={addToCart}
-                    toggleWishlist={toggleWishlist}
-                    setSelectedCategory={setSelectedCategory}
-                  />
-                )
+                <HomePage 
+                  categories={categories}
+                  products={products}
+                  wishlist={wishlist}
+                  addToCart={addToCart}
+                  toggleWishlist={toggleWishlist}
+                  setSelectedCategory={setSelectedCategory}
+                />
               } />
 
               {/* Products Page */}
               <Route path="/products" element={
-                loading ? (
-                  <div className="text-center py-16">
-                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-                    <p className="text-gray-600">Duke ngarkuar produktet...</p>
-                  </div>
-                ) : (
-                  <ProductsPage
-                    categories={categories}
-                    selectedCategory={selectedCategory}
-                    setSelectedCategory={setSelectedCategory}
-                    filteredProducts={filteredProducts}
-                    addToCart={addToCart}
-                    toggleWishlist={toggleWishlist}
-                    wishlist={wishlist}
-                    searchQuery={searchQuery}
-                    setSearchQuery={setSearchQuery}
-                  />
-                )
-              } />
-
-              <Route path="/checkout" element={
-                <Checkout
-                  cartItems={cartItems}
-                  cartTotal={cartTotal}
+                <ProductsPage 
+                  categories={categories}
+                  selectedCategory={selectedCategory}
+                  setSelectedCategory={setSelectedCategory}
+                  filteredProducts={filteredProducts}
+                  addToCart={addToCart}
+                  toggleWishlist={toggleWishlist}
+                  wishlist={wishlist}
+                  searchQuery={searchQuery}
+                  setSearchQuery={setSearchQuery}
                 />
               } />
 
@@ -410,7 +347,7 @@ const getDefaultImage = () => {
 
               {/* Wishlist Page */}
               <Route path="/wishlist" element={
-                <WishlistPage
+                <WishlistPage 
                   wishlist={wishlist}
                   toggleWishlist={toggleWishlist}
                   addToCart={addToCart}
@@ -420,18 +357,19 @@ const getDefaultImage = () => {
               {/* Profile Page */}
               <Route path="/profile" element={
                 <ProtectedRoute>
-                  <Profile />
+               <Profile/>
                 </ProtectedRoute>
               } />
 
-              {/* Contact Page */}
+               {/* Contact Page */}
               <Route path="/contactus" element={
                 <ProtectedRoute>
-                  <ContactUs />
+               <ContactUs/>
                 </ProtectedRoute>
               } />
 
-              {/* Orders Page (user orders) */}
+
+              {/* Orders Page */}
               <Route path="/orders" element={
                 <ProtectedRoute>
                   <div className="max-w-4xl mx-auto">
@@ -443,35 +381,18 @@ const getDefaultImage = () => {
                 </ProtectedRoute>
               } />
 
-              {/* Admin Routes - Përdor AdminLayout */}
-              <Route path="/admin" element={
-                <ProtectedRoute allowedRoles={['admin', 'administrator']}>
-                  <AdminLayout />
-                </ProtectedRoute>
-              }>
-                <Route index element={<Dashboard />} />
-                <Route path="dashboard" element={<Dashboard />} />
-                <Route path="products" element={<Products />} />
-                <Route path="users" element={<Users />} />
-                <Route path="orders" element={<Orders />} />
-                <Route path="settings" element={
-                  <div className="p-6">
-                    <h1 className="text-3xl font-bold mb-6">Settings</h1>
-                    <p>Settings page here</p>
-                  </div>
-                } />
-              </Route>
-              
-              <Route path="/my-orders" element={
-                <ProtectedRoute requireEmailVerification={false}>
-                  <MyOrders />
-                </ProtectedRoute>
-              } />
+              {/* Admin Dashboard */}
+<Route path="/admin/dashboard" element={
+  <ProtectedRoute allowedRoles={['admin', 'administrator']}>
+    <AdminDashboard /> 
+  </ProtectedRoute>
+} />
+
               {/* Cart Page */}
               <Route path="/cart" element={
-                <CartPage
+                <CartPage 
                   cart={cart}
-                  cartTotal={cartTotalCalc}
+                  cartTotal={cartTotal}
                   cartItemCount={cartItemCount}
                   removeFromCart={removeFromCart}
                   updateQuantity={updateQuantity}
@@ -483,7 +404,13 @@ const getDefaultImage = () => {
 
               <Route path="/register" element={<Register />} />
               <Route path="/login" element={<Login />} />
-              <Route path="/logout" element={<Logout />} />
+              <Route path="/logout" element={<Logout />} /> {/* Shto këtë linjë */}
+              <Route path="/profile" element={
+  <ProtectedRoute>
+    <Profile />
+  </ProtectedRoute>
+} />
+
             </Routes>
           </div>
 
@@ -534,6 +461,7 @@ const getDefaultImage = () => {
                   <ul className="space-y-3">
                     <li><Link to="#" className="text-gray-400 hover:text-white">Help Center</Link></li>
                     <li><Link to="/contactus" className="text-gray-400 hover:text-white">Contact Us</Link></li>
+                   
                   </ul>
                 </div>
 
@@ -584,7 +512,7 @@ const getDefaultImage = () => {
   );
 }
 
-// Home Page Component - I NJËJTË SI MË PARË
+// Home Page Component
 function HomePage({ categories, products, wishlist, addToCart, toggleWishlist, setSelectedCategory }) {
   const navigate = useNavigate();
 
@@ -605,6 +533,7 @@ function HomePage({ categories, products, wishlist, addToCart, toggleWishlist, s
                 <Link to="/products" className="px-8 py-4 bg-white text-blue-900 rounded-full font-semibold hover:shadow-2xl transition-shadow">
                   Shop Now
                 </Link>
+               
               </div>
             </div>
             <div className="relative">
@@ -695,7 +624,7 @@ function HomePage({ categories, products, wishlist, addToCart, toggleWishlist, s
   );
 }
 
-// Products Page Component - I NJËJTË SI MË PARË
+// Products Page Component
 function ProductsPage({ categories, selectedCategory, setSelectedCategory, filteredProducts, addToCart, toggleWishlist, wishlist, searchQuery, setSearchQuery }) {
   return (
     <div className="space-y-8">
@@ -759,12 +688,12 @@ function ProductsPage({ categories, selectedCategory, setSelectedCategory, filte
   );
 }
 
-// Wishlist Page Component - I NJËJTË SI MË PARË
+// Wishlist Page Component
 function WishlistPage({ wishlist, toggleWishlist, addToCart }) {
   return (
     <div className="max-w-7xl mx-auto">
       <h1 className="text-3xl font-bold text-gray-900 mb-8">My Wishlist</h1>
-
+      
       {wishlist.length === 0 ? (
         <div className="text-center py-16">
           <div className="inline-block p-8 bg-gradient-to-r from-pink-100 to-red-100 rounded-full mb-6">
@@ -819,30 +748,8 @@ function WishlistPage({ wishlist, toggleWishlist, addToCart }) {
   );
 }
 
+// Cart Page Component
 function CartPage({ cart, cartTotal, cartItemCount, removeFromCart, updateQuantity, clearCart, checkout, isAuthenticated }) {
-  const navigate = useNavigate();
-  const [user, setUser] = useState(null);
-
-  useEffect(() => {
-    const userData = JSON.parse(localStorage.getItem('user'));
-    setUser(userData);
-  }, []);
-
-  const handleCheckout = () => {
-    if (cart.length === 0) {
-      toast.warning('Your cart is empty!');
-      return;
-    }
-
-    if (!user) {
-      toast.error('Please login to continue checkout');
-      navigate('/login');
-      return;
-    }
-
-    navigate('/checkout');
-  };
-
   return (
     <div className="max-w-7xl mx-auto">
       <h1 className="text-3xl font-bold text-gray-900 mb-8">Shopping Cart</h1>
@@ -883,13 +790,10 @@ function CartPage({ cart, cartTotal, cartItemCount, removeFromCart, updateQuanti
                           <button
                             onClick={() => updateQuantity(item.id, -1)}
                             className="p-1 hover:bg-gray-200 rounded-full"
-                            disabled={item.quantity <= 1}
                           >
                             <FiMinus />
                           </button>
-                          <span className="font-semibold text-lg w-8 text-center">
-                            {item.quantity}
-                          </span>
+                          <span className="font-semibold text-lg">{item.quantity}</span>
                           <button
                             onClick={() => updateQuantity(item.id, 1)}
                             className="p-1 hover:bg-gray-200 rounded-full"
@@ -913,16 +817,12 @@ function CartPage({ cart, cartTotal, cartItemCount, removeFromCart, updateQuanti
 
             {/* Cart Actions */}
             <div className="flex justify-between">
-              <button
-                onClick={() => navigate('/products')}
-                className="flex items-center px-6 py-3 border-2 border-purple-600 text-purple-600 rounded-full hover:bg-purple-50 transition-colors"
-              >
-                <FiArrowLeft className="mr-2" />
+              <Link to="/products" className="px-6 py-3 border-2 border-blue-600 text-blue-600 rounded-full hover:bg-blue-50">
                 Continue Shopping
-              </button>
+              </Link>
               <button
                 onClick={clearCart}
-                className="px-6 py-3 text-red-600 hover:text-red-700 hover:bg-red-50 rounded-full"
+                className="px-6 py-3 text-red-600 hover:text-red-700"
               >
                 Clear Cart
               </button>
@@ -944,43 +844,45 @@ function CartPage({ cart, cartTotal, cartItemCount, removeFromCart, updateQuanti
                   <span className="text-green-600">FREE</span>
                 </div>
                 <div className="flex justify-between text-gray-600">
-                  <span>Tax (8%)</span>
+                  <span>Tax</span>
                   <span>${(cartTotal * 0.08).toFixed(2)}</span>
                 </div>
                 <div className="border-t pt-4">
                   <div className="flex justify-between text-2xl font-bold">
                     <span>Total</span>
-                    <span className="bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-                      ${(cartTotal * 1.08).toFixed(2)}
-                    </span>
+                    <span className="text-blue-600">${(cartTotal * 1.08).toFixed(2)}</span>
                   </div>
                 </div>
               </div>
 
               <button
-                onClick={handleCheckout}
-                className="w-full py-4 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-full font-semibold text-lg hover:shadow-xl hover:shadow-purple-500/25 transition-all"
+                onClick={checkout}
+                className="w-full py-4 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-full font-semibold text-lg hover:shadow-xl transition-shadow"
               >
                 Proceed to Checkout
               </button>
 
+              <div className="mt-6 space-y-4">
+                <div className="text-center text-gray-500">or pay with</div>
+                <div className="flex justify-center space-x-4">
+                  <FaPaypal className="text-3xl text-blue-800 cursor-pointer" />
+                  <FaCcVisa className="text-3xl text-blue-600 cursor-pointer" />
+                  <FaCcMastercard className="text-3xl text-red-600 cursor-pointer" />
+                  <FaCcAmex className="text-3xl text-blue-900 cursor-pointer" />
+                </div>
+              </div>
+
               <div className="mt-8 space-y-3">
                 <div className="flex items-center text-sm text-gray-600">
-                  <div className="w-5 h-5 rounded-full bg-green-100 text-green-600 flex items-center justify-center mr-2">
-                    ✓
-                  </div>
+                  <FiCheck className="text-green-500 mr-2" />
                   Free returns within 30 days
                 </div>
                 <div className="flex items-center text-sm text-gray-600">
-                  <div className="w-5 h-5 rounded-full bg-green-100 text-green-600 flex items-center justify-center mr-2">
-                    ✓
-                  </div>
+                  <FiCheck className="text-green-500 mr-2" />
                   Secure SSL encryption
                 </div>
                 <div className="flex items-center text-sm text-gray-600">
-                  <div className="w-5 h-5 rounded-full bg-green-100 text-green-600 flex items-center justify-center mr-2">
-                    ✓
-                  </div>
+                  <FiCheck className="text-green-500 mr-2" />
                   24/7 customer support
                 </div>
               </div>
@@ -992,7 +894,7 @@ function CartPage({ cart, cartTotal, cartItemCount, removeFromCart, updateQuanti
   );
 }
 
-// Product Card Component 
+// Product Card Component
 function ProductCard({ product, addToCart, toggleWishlist, isInWishlist }) {
   return (
     <div className="group bg-white rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-300 overflow-hidden">
@@ -1007,8 +909,8 @@ function ProductCard({ product, addToCart, toggleWishlist, isInWishlist }) {
           <button
             onClick={() => toggleWishlist(product)}
             className={`p-2 rounded-full backdrop-blur-sm ${isInWishlist
-              ? 'bg-red-500 text-white'
-              : 'bg-white/80 text-gray-700 hover:bg-red-500 hover:text-white'
+                ? 'bg-red-500 text-white'
+                : 'bg-white/80 text-gray-700 hover:bg-red-500 hover:text-white'
               } transition-colors`}
           >
             <FiHeart className={isInWishlist ? 'fill-current' : ''} />
@@ -1071,7 +973,7 @@ function ProductCard({ product, addToCart, toggleWishlist, isInWishlist }) {
   );
 }
 
-// Empty Cart Component 
+// Empty Cart Component
 function EmptyCart() {
   const navigate = useNavigate();
 
