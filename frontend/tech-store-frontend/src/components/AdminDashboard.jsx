@@ -6,8 +6,7 @@ import { Line, Bar, Pie } from 'react-chartjs-2';
 import { format } from 'date-fns';
 import { toast } from 'react-toastify';
 import { fetchWithAuth } from '../services/authService';
-// Hiq API_URL import nëse nuk përdoret
-// import { API_URL } from '../utils/constants';
+import { API_URL } from '../utils/constants';
 import CategoriesManagement from './CategoriesManagement';
 import UsersManagement from './UserManagement';
 import ProductManagement from './ProductManagement';
@@ -65,211 +64,49 @@ const AdminDashboard = () => {
   const fetchDashboardData = async () => {
     try {
       setLoading(true);
-      console.log('🔍 Fetching dashboard data...');
-      
-      // Debug - test individual endpoint
-      const testUrl = '/api/admin/dashboard/stats';
-      console.log('Testing URL:', testUrl);
-      
-      const testResponse = await fetch(testUrl, {
-        credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json'
-        }
-      });
-      
-      console.log('Test response:', {
-        ok: testResponse.ok,
-        status: testResponse.status,
-        statusText: testResponse.statusText
-      });
       
       // Fetch all data in parallel
       const [statsRes, ordersRes, productsRes, salesRes, categoriesRes] = await Promise.all([
-        fetchWithAuth(`/api/admin/dashboard/stats`),
-        fetchWithAuth(`/api/admin/orders/recent`),
-        fetchWithAuth(`/api/admin/products/top`),
-        fetchWithAuth(`/api/admin/sales/last-${timeRange}-days`),
-        fetchWithAuth(`/api/admin/categories/distribution`)
+        fetchWithAuth(`${API_URL}/api/admin/dashboard/stats`),
+        fetchWithAuth(`${API_URL}/api/admin/orders/recent`),
+        fetchWithAuth(`${API_URL}/api/admin/products/top`),
+        fetchWithAuth(`${API_URL}/api/admin/sales/last-${timeRange}-days`),
+        fetchWithAuth(`${API_URL}/api/admin/categories/distribution`)
       ]);
-
-      console.log('Responses received:', {
-        stats: statsRes.status,
-        orders: ordersRes.status,
-        products: productsRes.status,
-        sales: salesRes.status,
-        categories: categoriesRes.status
-      });
 
       // Process stats
       if (statsRes.ok) {
         const statsData = await statsRes.json();
-        console.log('Stats data:', statsData);
         setStats(statsData);
-      } else {
-        console.error('Stats fetch failed:', statsRes.status);
-        // Set default stats
-        setStats({
-          totalUsers: 1,
-          totalProducts: 10,
-          totalOrders: 5,
-          totalRevenue: 1299.99,
-          lowStockProducts: 2,
-          todayOrders: 1,
-          todayRevenue: 129.99
-        });
       }
 
       // Process recent orders
       if (ordersRes.ok) {
         const ordersData = await ordersRes.json();
-        console.log('Orders data:', ordersData);
         setRecentOrders(ordersData);
-      } else {
-        console.error('Orders fetch failed:', ordersRes.status);
-        // Set mock orders
-        setRecentOrders([
-          {
-            id: 1,
-            order_number: 'ORD-001',
-            customer: 'John Doe',
-            amount: 129.99,
-            status: 'completed',
-            date: new Date().toISOString()
-          },
-          {
-            id: 2,
-            order_number: 'ORD-002',
-            customer: 'Jane Smith',
-            amount: 299.99,
-            status: 'processing',
-            date: new Date(Date.now() - 86400000).toISOString()
-          }
-        ]);
       }
 
       // Process top products
       if (productsRes.ok) {
         const productsData = await productsRes.json();
-        console.log('Products data:', productsData);
         setTopProducts(productsData);
-      } else {
-        console.error('Products fetch failed:', productsRes.status);
-        // Set mock products
-        setTopProducts([
-          {
-            id: 1,
-            name: 'Laptop',
-            price: 999.99,
-            sales: 15,
-            revenue: 14999.85
-          },
-          {
-            id: 2,
-            name: 'Smartphone',
-            price: 699.99,
-            sales: 23,
-            revenue: 16099.77
-          }
-        ]);
       }
 
       // Process sales data
       if (salesRes.ok) {
         const salesData = await salesRes.json();
-        console.log('Sales data:', salesData);
         setSalesData(salesData);
-      } else {
-        console.error('Sales fetch failed:', salesRes.status);
-        // Generate mock sales data
-        const mockSalesData = [];
-        const today = new Date();
-        for (let i = parseInt(timeRange) - 1; i >= 0; i--) {
-          const date = new Date(today);
-          date.setDate(date.getDate() - i);
-          mockSalesData.push({
-            date: date.toISOString().split('T')[0],
-            orders: Math.floor(Math.random() * 20) + 5,
-            revenue: Math.floor(Math.random() * 5000) + 1000
-          });
-        }
-        setSalesData(mockSalesData);
       }
 
       // Process categories data
       if (categoriesRes.ok) {
         const categoriesData = await categoriesRes.json();
-        console.log('Categories data:', categoriesData);
         setCategoriesData(categoriesData);
-      } else {
-        console.error('Categories fetch failed:', categoriesRes.status);
-        // Set mock categories
-        setCategoriesData([
-          { category: 'Electronics', product_count: 45, total_sales: 156 },
-          { category: 'Computers', product_count: 32, total_sales: 89 },
-          { category: 'Mobile', product_count: 67, total_sales: 234 },
-          { category: 'Accessories', product_count: 28, total_sales: 123 },
-          { category: 'Audio', product_count: 39, total_sales: 178 }
-        ]);
       }
-
-      toast.success('Dashboard data loaded successfully');
 
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
       toast.error('Could not load dashboard data');
-      
-      // Set mock data for demo purposes
-      setStats({
-        totalUsers: 1,
-        totalProducts: 10,
-        totalOrders: 5,
-        totalRevenue: 1299.99,
-        lowStockProducts: 2,
-        todayOrders: 1,
-        todayRevenue: 129.99
-      });
-      
-      setRecentOrders([
-        {
-          id: 1,
-          order_number: 'ORD-001',
-          customer: 'Demo User',
-          amount: 129.99,
-          status: 'completed',
-          date: new Date().toISOString()
-        }
-      ]);
-      
-      setTopProducts([
-        {
-          id: 1,
-          name: 'Demo Product',
-          price: 99.99,
-          sales: 10,
-          revenue: 999.90
-        }
-      ]);
-      
-      // Generate mock sales data
-      const mockSalesData = [];
-      const today = new Date();
-      for (let i = parseInt(timeRange) - 1; i >= 0; i--) {
-        const date = new Date(today);
-        date.setDate(date.getDate() - i);
-        mockSalesData.push({
-          date: date.toISOString().split('T')[0],
-          orders: Math.floor(Math.random() * 20) + 5,
-          revenue: Math.floor(Math.random() * 5000) + 1000
-        });
-      }
-      setSalesData(mockSalesData);
-      
-      setCategoriesData([
-        { category: 'Smartphones', product_count: 45, total_sales: 156 },
-        { category: 'Laptops', product_count: 32, total_sales: 89 },
-        { category: 'Audio', product_count: 67, total_sales: 234 }
-      ]);
     } finally {
       setLoading(false);
     }

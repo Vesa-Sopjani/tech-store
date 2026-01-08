@@ -1,3 +1,4 @@
+// backend/services/user-service/app.js
 const express = require('express');
 const mysql = require('mysql2/promise');
 const cors = require('cors');
@@ -5,37 +6,139 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
-const { v4: uuidv4 } = require('uuid').v4;
+const validator = require('validator');
 const net = require('net');
 require('dotenv').config();
+const { v4: uuidv4 } = require('uuid');
+const promClient = require('prom-client');
+const cookieParser = require('cookie-parser');
 
+// Import routes
+const captchaRoutes = require('./routes/captcha');
+const authRoutes = require('./routes/authRoutes');
+const adminUserRoutes = require('./routes/adminUserRoutes');
+
+// Import middlewares
+const authenticateToken = require('../../middlewares/authenticateToken');
+
+// Services
+const kafkaService = require('./kafka-service');
+const captchaService = require('./captcha-service');
+const CacheManager = require('./cacheManager');
+
+// ==================== PROMETHEUS CONFIGURATION ====================
+// Krijo middleware për metrika automatikisht
+
+// Registry për custom metrics
+const register = new promClient.Registry();
+promClient.collectDefaultMetrics({ register });
+
+// Custom metrics
+const userRegistrationsCounter = new promClient.Counter({
+  name: 'user_registrations_total',
+  help: 'Total number of user registrations',
+  labelNames: ['status', 'method']
+});
+
+const userLoginsCounter = new promClient.Counter({
+  name: 'user_logins_total',
+  help: 'Total number of user logins',
+  labelNames: ['method', 'status']
+});
+
+const activeSessionsGauge = new promClient.Gauge({
+  name: 'active_sessions',
+  help: 'Number of active user sessions'
+});
+
+const httpRequestDuration = new promClient.Histogram({
+  name: 'http_request_duration_seconds',
+  help: 'Duration of HTTP requests in seconds',
+  labelNames: ['method', 'route', 'status_code'],
+  buckets: [0.1, 0.5, 1, 2, 5, 10]
+});
+
+// Regjistro custom metrics
+register.registerMetric(userRegistrationsCounter);
+register.registerMetric(userLoginsCounter);
+register.registerMetric(activeSessionsGauge);
+register.registerMetric(httpRequestDuration);
+
+// ==================== EXPRESS APP INITIALIZATION ====================
 const app = express();
 
-// ==================== PORT CONFIGURATION ====================
-const getAvailablePort = (startPort) => {
-  return new Promise((resolve, reject) => {
-    const server = net.createServer();
-    
-    server.once('error', (err) => {
-      if (err.code === 'EADDRINUSE') {
-        console.log(`⚠️  Port ${startPort} is busy, trying ${startPort + 1}...`);
-        resolve(getAvailablePort(startPort + 1));
-      } else {
-        reject(err);
-      }
-    });
-    
-    server.once('listening', () => {
-      server.close(() => {
-        resolve(startPort);
-      });
-    });
-    
-    server.listen(startPort);
-  });
-};
+// Config - PËRDOR .env VARIABLES
+const JWT_ACCESS_SECRET = process.env.JWT_ACCESS_SECRET || 'access_secret_default_change_this';
+const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || 'refresh_secret_default_change_this';
+const BCRYPT_ROUNDS = parseInt(process.env.BCRYPT_ROUNDS) || 12;
 
-// ==================== CORS CONFIGURATION ====================
+// Database pool
+const pool = mysql.createPool({
+  host: process.env.DB_HOST || 'localhost',
+  user: process.env.DB_USER || 'root',
+  password: process.env.DB_PASSWORD || '',
+  database: process.env.DB_NAME || 'TechProductDB',
+  waitForConnections: true,
+  connectionLimit: 15,
+  queueLimit: 0
+});
+
+// Cache manager
+const cacheManager = new CacheManager();
+
+// ==================== MIDDLEWARE CONFIGURATION ====================
+
+// 1. Logging middleware (së pari)
+app.use((req, res, next) => {
+  const start = Date.now();
+  const requestId = uuidv4();
+  req.requestId = requestId;
+  
+  res.on('finish', () => {
+    const duration = Date.now() - start;
+    console.log(`[${requestId}] ${req.method} ${req.path} - ${res.statusCode} - ${duration}ms`);
+    
+    // Regjistro metrikën e kohës së përgjigjes
+    httpRequestDuration
+      .labels(req.method, req.path, res.statusCode)
+      .observe(duration / 1000);
+  });
+  
+  next();
+});
+
+// 2. Prometheus metrics middleware (pas logging)
+app.use((req, res, next) => {
+  const start = Date.now();
+  
+  res.on('finish', () => {
+    const duration = Date.now() - start;
+    
+    // Mat kohën e përgjigjes (nëse ke metrikën custom)
+    if (httpRequestDuration) {
+      httpRequestDuration
+        .labels(req.method, req.route?.path || req.path, res.statusCode.toString())
+        .observe(duration / 1000);
+    }
+  });
+  
+  next();
+});
+
+// 3. Helmet for security headers
+app.use(helmet({
+  contentSecurityPolicy: process.env.NODE_ENV === 'production' ? {
+    directives: {
+      defaultSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      scriptSrc: ["'self'"],
+      imgSrc: ["'self'", "data:", "https:"]
+    }
+  } : false,
+  crossOriginEmbedderPolicy: false
+}));
+
+// 4. CORS configuration
 const corsOptions = {
   origin: process.env.FRONTEND_URL || 'http://localhost:5173',
   credentials: true,
@@ -47,36 +150,28 @@ const corsOptions = {
     'X-API-Key',
     'X-Request-ID',
     'Accept',
-    'Origin',
-    'Access-Control-Allow-Headers',
-    'Access-Control-Allow-Origin',
-    'Access-Control-Allow-Credentials'
+    'Origin'
   ],
-  exposedHeaders: [
-    'Authorization',
-    'Set-Cookie',
-    'Access-Control-Allow-Origin',
-    'Access-Control-Allow-Credentials'
-  ],
-  preflightContinue: false,
-  optionsSuccessStatus: 200
+  exposedHeaders: ['Authorization', 'Set-Cookie']
 };
 
-// Apply CORS middleware
 app.use(cors(corsOptions));
 
-// Handle OPTIONS requests
+// 5. Handle OPTIONS requests (preflight)
 app.options('*', cors(corsOptions));
 
-// ==================== SECURITY MIDDLEWARE ====================
+// 6. Cookie parser
+app.use(cookieParser());
+
+// 7. Body parsers
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true }));
+
+// 8. Rate limiting
 const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
+  windowMs: 15 * 60 * 1000, // 15 minutes
   max: 80,
-  message: { 
-    success: false, 
-    message: 'Too many login attempts',
-    timestamp: new Date().toISOString()
-  },
+  message: { success: false, message: 'Too many login attempts' },
   standardHeaders: true,
   legacyHeaders: false
 });
@@ -84,406 +179,407 @@ const authLimiter = rateLimit({
 const generalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 100,
-  message: { 
-    success: false, 
-    message: 'Too many requests',
-    timestamp: new Date().toISOString()
-  },
+  message: { success: false, message: 'Too many requests' },
   standardHeaders: true,
   legacyHeaders: false
 });
 
-app.use(helmet({
-  crossOriginResourcePolicy: { policy: "cross-origin" },
-  crossOriginEmbedderPolicy: false
-}));
-
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true }));
-
 app.use('/api/auth/', authLimiter);
 app.use('/api/', generalLimiter);
 
-// ==================== DATABASE CONFIGURATION ====================
-const dbConfig = {
-  host: process.env.DB_HOST || 'mysql',
-  user: process.env.DB_USER || 'root',
-  password: process.env.DB_PASSWORD || 'root',
-  database: process.env.DB_NAME || 'TechProductDB',
-  waitForConnections: true,
-  connectionLimit: 15,
-  queueLimit: 0
+// ==================== SERVICE INITIALIZATION ====================
+
+const initializeServices = async () => {
+  try {
+    await cacheManager.initialize();
+    console.log(`✅ Cache initialized: ${cacheManager.isRedisAvailable() ? 'Redis' : 'Memory'}`);
+    
+    // Test database connection
+    const connection = await pool.getConnection();
+    connection.release();
+    console.log('✅ Database connected');
+    
+    // Initialize Kafka (optional)
+    if (kafkaService && kafkaService.initialize) {
+      await kafkaService.initialize();
+    }
+    
+    // Initialize session counter
+    activeSessionsGauge.set(0);
+    
+    console.log('✅ All services initialized successfully');
+  } catch (error) {
+    console.error('❌ Service initialization failed:', error);
+    throw error;
+  }
 };
 
-const pool = mysql.createPool(dbConfig);
+// ==================== HEALTH CHECK ENDPOINT ====================
 
-// JWT Secrets
-const JWT_ACCESS_SECRET = process.env.JWT_ACCESS_SECRET || 'your_super_secure_jwt_secret_2024';
-const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || 'your_super_secure_refresh_secret_2024';
-
-// ==================== MIDDLEWARE ====================
-const authenticateToken = (req, res, next) => {
-  const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1];
-
-  if (!token) {
-    return res.status(401).json({
-      success: false,
-      message: 'Access token required',
-      timestamp: new Date().toISOString()
-    });
+app.get('/health', async (req, res) => {
+  const healthChecks = {
+    database: false,
+    cache: false,
+    kafka: false,
+    service: true
+  };
+  
+  try {
+    // Check database
+    const connection = await pool.getConnection();
+    const [result] = await connection.query('SELECT 1 as health');
+    connection.release();
+    healthChecks.database = result[0].health === 1;
+  } catch (error) {
+    console.error('Database health check failed:', error);
+    healthChecks.database = false;
   }
+  
+  // Check cache
+  healthChecks.cache = cacheManager.isRedisAvailable();
+  
+  // Check Kafka (optional)
+  healthChecks.kafka = kafkaService && kafkaService.isAvailable ? true : false;
+  
+  const isHealthy = Object.values(healthChecks).every(check => check === true);
+  
+  const health = {
+    status: isHealthy ? 'UP' : 'DEGRADED',
+    service: 'user-service',
+    timestamp: new Date().toISOString(),
+    checks: healthChecks,
+    version: '2.0.0',
+    uptime: process.uptime(),
+    metrics: {
+      userRegistrations: userRegistrationsCounter.hashMap,
+      userLogins: userLoginsCounter.hashMap,
+      activeSessions: activeSessionsGauge.hashMap
+    }
+  };
 
-  jwt.verify(token, JWT_ACCESS_SECRET, (err, user) => {
-    if (err) {
-      return res.status(403).json({
-        success: false,
-        message: 'Invalid or expired token',
-        timestamp: new Date().toISOString()
+  res.status(isHealthy ? 200 : 503).json(health);
+});
+
+// ==================== METRICS ENDPOINT ====================
+
+app.get('/metrics', async (req, res) => {
+  try {
+    const metrics = await register.metrics();
+    res.set('Content-Type', register.contentType);
+    res.end(metrics);
+  } catch (error) {
+    console.error('Metrics endpoint error:', error);
+    res.status(500).end();
+  }
+});
+
+// ==================== DEBUG ENDPOINTS ====================
+
+// Test route për cookies debugging
+app.get('/api/debug/cookies', (req, res) => {
+  console.log('🍪 Cookies received:', req.cookies);
+  res.json({ 
+    cookies: req.cookies,
+    headers: req.headers,
+    timestamp: new Date().toISOString()
+  });
+});
+
+// Test route për CORS
+app.get('/api/test-cors', (req, res) => {
+  res.json({ 
+    message: 'CORS is working',
+    cookies: req.cookies,
+    origin: req.headers.origin,
+    method: req.method,
+    timestamp: new Date().toISOString()
+  });
+});
+
+// System info endpoint
+app.get('/api/system/info', authenticateToken, (req, res) => {
+  res.json({
+    service: 'user-service',
+    version: '2.0.0',
+    environment: process.env.NODE_ENV || 'development',
+    metrics: {
+      endpoints: {
+        health: '/health',
+        metrics: '/metrics',
+        debug: '/api/debug/cookies'
+      }
+    },
+    timestamp: new Date().toISOString()
+  });
+});
+
+// ==================== EVENT & AUDIT ROUTES ====================
+
+// Event publishing endpoint (for frontend)
+app.post('/api/events/publish', async (req, res) => {
+  try {
+    const { eventType, data, source } = req.body;
+    
+    console.log(`📨 Event received from ${source}: ${eventType}`);
+    
+    // Publish to Kafka if available
+    let kafkaSuccess = false;
+    if (kafkaService && kafkaService.publishEvent) {
+      kafkaSuccess = await kafkaService.publishEvent('frontend-events', {
+        eventType,
+        data,
+        source,
+        timestamp: new Date().toISOString(),
+        ip: req.ip,
+        userAgent: req.headers['user-agent']
       });
     }
-    req.user = user;
-    next();
-  });
-};
-
-// ==================== ROUTES ====================
-
-// Handle preflight requests
-app.use((req, res, next) => {
-  res.header('Access-Control-Allow-Origin', req.headers.origin || 'http://localhost:5173');
-  res.header('Access-Control-Allow-Credentials', 'true');
-  
-  if (req.method === 'OPTIONS') {
-    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
-    res.header('Access-Control-Allow-Headers', req.headers['access-control-request-headers'] || 'Content-Type, Authorization');
-    return res.status(200).end();
+    
+    // Store in database
+    const connection = await pool.getConnection();
+    await connection.execute(
+      'INSERT INTO Events (event_type, event_data, source, ip_address, user_agent) VALUES (?, ?, ?, ?, ?)',
+      [eventType, JSON.stringify(data), source, req.ip, req.headers['user-agent']]
+    );
+    connection.release();
+    
+    res.json({ 
+      success: true, 
+      kafkaPublished: kafkaSuccess,
+      message: 'Event processed successfully' 
+    });
+    
+  } catch (error) {
+    console.error('Event publishing error:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Failed to process event',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
   }
-  
+});
+
+// Audit log endpoint
+app.post('/api/audit/log', authenticateToken, async (req, res) => {
+  try {
+    const { action, details, service } = req.body;
+    
+    if (!action) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Action is required' 
+      });
+    }
+    
+    const connection = await pool.getConnection();
+    await connection.execute(
+      'INSERT INTO AuditLogs (action, details, user_id, service, ip_address) VALUES (?, ?, ?, ?, ?)',
+      [action, JSON.stringify(details || {}), req.user.id, service || 'user-service', req.ip]
+    );
+    connection.release();
+    
+    // Publish to Kafka
+    if (kafkaService && kafkaService.publishEvent) {
+      await kafkaService.publishEvent('audit-logs', {
+        action, 
+        details, 
+        userId: req.user.id, 
+        service, 
+        timestamp: new Date().toISOString(),
+        ip: req.ip
+      });
+    }
+    
+    res.json({ 
+      success: true,
+      message: 'Audit log recorded successfully'
+    });
+    
+  } catch (error) {
+    console.error('Audit log error:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Failed to record audit log'
+    });
+  }
+});
+
+// Get audit logs (admin only)
+app.get('/api/audit/logs', authenticateToken, async (req, res) => {
+  try {
+    // Check if user is admin
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ 
+        success: false, 
+        message: 'Access denied. Admin only.' 
+      });
+    }
+    
+    const { page = 1, limit = 50, userId, action } = req.query;
+    const offset = (page - 1) * limit;
+    
+    let query = 'SELECT * FROM AuditLogs WHERE 1=1';
+    const params = [];
+    
+    if (userId) {
+      query += ' AND user_id = ?';
+      params.push(userId);
+    }
+    
+    if (action) {
+      query += ' AND action LIKE ?';
+      params.push(`%${action}%`);
+    }
+    
+    query += ' ORDER BY created_at DESC LIMIT ? OFFSET ?';
+    params.push(parseInt(limit), parseInt(offset));
+    
+    const connection = await pool.getConnection();
+    const [logs] = await connection.execute(query, params);
+    connection.release();
+    
+    res.json({ 
+      success: true, 
+      data: logs,
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total: logs.length
+      }
+    });
+    
+  } catch (error) {
+    console.error('Get audit logs error:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Failed to fetch audit logs' 
+    });
+  }
+});
+
+// ==================== AUTH ROUTES ====================
+
+app.use('/api/auth', authRoutes);
+
+// Session tracking middleware (për active sessions)
+app.use('/api/auth/', (req, res, next) => {
+  if (req.method === 'POST' && req.path.includes('/login')) {
+    activeSessionsGauge.inc();
+  } else if (req.method === 'POST' && req.path.includes('/logout')) {
+    activeSessionsGauge.dec();
+  }
   next();
 });
 
-// Root endpoint
+// ==================== USER PROFILE ROUTE ====================
+
+app.get('/api/users/profile', authenticateToken, async (req, res) => {
+  let connection;
+  try {
+    // Try cache first
+    const cacheKey = `user:${req.user.id}`;
+    const cachedUser = await cacheManager.get(cacheKey);
+    
+    if (cachedUser) {
+      console.log(`Cache hit for user ${req.user.id}`);
+      return res.json({ 
+        success: true, 
+        data: cachedUser, 
+        source: 'cache',
+        timestamp: new Date().toISOString()
+      });
+    }
+    
+    // Database fallback
+    connection = await pool.getConnection();
+    const [users] = await connection.execute(
+      'SELECT id, username, email, full_name, role, created_at, updated_at FROM Users WHERE id = ?',
+      [req.user.id]
+    );
+    
+    if (users.length === 0) {
+      return res.status(404).json({ 
+        success: false, 
+        message: 'User not found' 
+      });
+    }
+    
+    const user = users[0];
+    
+    // Cache the result
+    await cacheManager.set(cacheKey, user, 300); // Cache for 5 minutes
+    
+    res.json({ 
+      success: true, 
+      data: user, 
+      source: 'database',
+      timestamp: new Date().toISOString()
+    });
+    
+  } catch (error) {
+    console.error('Profile error:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Server error',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  } finally {
+    if (connection) connection.release();
+  }
+});
+
+// User validation route (për frontend)
+app.get('/api/auth/validate', authenticateToken, (req, res) => {
+  res.json({
+    success: true,
+    authenticated: true,
+    user: {
+      id: req.user.id,
+      username: req.user.username,
+      email: req.user.email,
+      role: req.user.role,
+      full_name: req.user.full_name
+    },
+    timestamp: new Date().toISOString()
+  });
+});
+
+// ==================== ADMIN USER MANAGEMENT ROUTES ====================
+app.use('/api/admin/users', authenticateToken, adminUserRoutes);
+
+// ==================== CAPTCHA ROUTES ====================
+app.use('/api/captcha', captchaRoutes);
+
+// ==================== DEFAULT & ERROR HANDLERS ====================
+
+// Default route
 app.get('/', (req, res) => {
   res.json({
     message: 'User Service API - Tech Store',
     version: '2.0.0',
     timestamp: new Date().toISOString(),
     endpoints: {
-      login: 'POST /api/auth/login',
-      register: 'POST /api/auth/register',
+      auth: {
+        login: 'POST /api/auth/login',
+        register: 'POST /api/auth/register',
+        refresh: 'POST /api/auth/refresh',
+        logout: 'POST /api/auth/logout',
+        validate: 'GET /api/auth/validate (authenticated)'
+      },
       profile: 'GET /api/users/profile (authenticated)',
+      admin: 'GET /api/admin/users (admin only)',
+      audit: 'GET /api/audit/logs (admin only)',
+      events: 'POST /api/events/publish',
+      system: 'GET /api/system/info (authenticated)',
       health: 'GET /health',
-      test: 'GET /api/test'
+      metrics: 'GET /metrics',
+      debug: 'GET /api/debug/cookies'
     },
-    cors: {
-      enabled: true,
-      origin: req.headers.origin || 'http://localhost:5173'
+    monitoring: {
+      prometheus: '/metrics endpoint available',
+      health: 'Comprehensive health checks',
+      metrics: 'Custom business metrics tracking'
     }
-  });
-});
-
-// Health check
-app.get('/health', async (req, res) => {
-  const health = {
-    status: 'UP',
-    service: 'user-service',
-    timestamp: new Date().toISOString(),
-    checks: {
-      database: 'UP'
-    }
-  };
-
-  try {
-    const connection = await pool.getConnection();
-    await connection.execute('SELECT 1');
-    connection.release();
-  } catch (err) {
-    health.status = 'UP';
-    health.checks.database = 'DOWN';
-  }
-
-  res.json(health);
-});
-
-// Test endpoint
-app.get('/api/test', (req, res) => {
-  res.json({
-    success: true,
-    message: 'User service is working',
-    timestamp: new Date().toISOString(),
-    cors: 'enabled'
-  });
-});
-
-// Users API root
-app.get('/api/users', (req, res) => {
-  res.json({
-    success: true,
-    message: 'Users API',
-    version: '2.0.0',
-    timestamp: new Date().toISOString(),
-    endpoints: {
-      profile: 'GET /api/users/profile',
-      list: 'GET /api/users/list (admin)'
-    }
-  });
-});
-
-// Auth API root
-app.get('/api/auth', (req, res) => {
-  res.json({
-    success: true,
-    message: 'Authentication API',
-    version: '2.0.0',
-    timestamp: new Date().toISOString(),
-    endpoints: {
-      login: 'POST /api/auth/login',
-      register: 'POST /api/auth/register',
-      refresh: 'POST /api/auth/refresh',
-      logout: 'POST /api/auth/logout'
-    }
-  });
-});
-
-// LOGIN ENDPOINT (CRITICAL FOR FRONTEND)
-app.post('/api/auth/login', async (req, res) => {
-  try {
-    console.log('Login attempt:', { 
-      email: req.body.email, 
-      timestamp: new Date().toISOString(),
-      origin: req.headers.origin 
-    });
-    
-    const { email, password } = req.body;
-    
-    if (!email || !password) {
-      return res.status(400).json({
-        success: false,
-        message: 'Email and password are required',
-        timestamp: new Date().toISOString()
-      });
-    }
-    
-    // Mock login for testing (in production, check database)
-    const mockUsers = {
-      'admin@techstore.com': {
-        id: 1,
-        email: 'admin@techstore.com',
-        password: '$2a$12$YourHashedPasswordHere', // bcrypt hash of 'admin123'
-        name: 'Admin User',
-        role: 'admin'
-      },
-      'user@example.com': {
-        id: 2,
-        email: 'user@example.com',
-        password: '$2a$12$YourHashedPasswordHere',
-        name: 'Regular User',
-        role: 'user'
-      }
-    };
-    
-    const user = mockUsers[email];
-    
-    if (!user) {
-      return res.status(401).json({
-        success: false,
-        message: 'Invalid credentials',
-        timestamp: new Date().toISOString()
-      });
-    }
-    
-    // In production, verify password with bcrypt
-    // const isValid = await bcrypt.compare(password, user.password);
-    const isValid = password === 'admin123'; // Simple check for testing
-    
-    if (!isValid) {
-      return res.status(401).json({
-        success: false,
-        message: 'Invalid credentials',
-        timestamp: new Date().toISOString()
-      });
-    }
-    
-    // Generate JWT tokens
-    const accessToken = jwt.sign(
-      { 
-        id: user.id, 
-        email: user.email, 
-        name: user.name, 
-        role: user.role 
-      },
-      JWT_ACCESS_SECRET,
-      { expiresIn: '15m' }
-    );
-    
-    const refreshToken = jwt.sign(
-      { id: user.id },
-      JWT_REFRESH_SECRET,
-      { expiresIn: '7d' }
-    );
-    
-    // Set refresh token as HTTP-only cookie
-    res.cookie('refreshToken', refreshToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
-    });
-    
-    res.json({
-      success: true,
-      message: 'Login successful',
-      user: {
-        id: user.id,
-        email: user.email,
-        name: user.name,
-        role: user.role
-      },
-      accessToken,
-      timestamp: new Date().toISOString()
-    });
-    
-  } catch (err) {
-    console.error('Login error:', err);
-    res.status(500).json({
-      success: false,
-      message: 'Server error during login',
-      timestamp: new Date().toISOString()
-    });
-  }
-});
-
-// Register endpoint
-app.post('/api/auth/register', async (req, res) => {
-  try {
-    const { email, password, name } = req.body;
-    
-    if (!email || !password || !name) {
-      return res.status(400).json({
-        success: false,
-        message: 'All fields are required',
-        timestamp: new Date().toISOString()
-      });
-    }
-    
-    // Mock registration (in production, save to database)
-    const hashedPassword = await bcrypt.hash(password, 12);
-    
-    res.status(201).json({
-      success: true,
-      message: 'Registration successful',
-      user: {
-        id: Math.floor(Math.random() * 1000),
-        email,
-        name,
-        role: 'user'
-      },
-      timestamp: new Date().toISOString()
-    });
-    
-  } catch (err) {
-    console.error('Registration error:', err);
-    res.status(500).json({
-      success: false,
-      message: 'Server error during registration',
-      timestamp: new Date().toISOString()
-    });
-  }
-});
-
-// Refresh token endpoint
-app.post('/api/auth/refresh', (req, res) => {
-  try {
-    const refreshToken = req.cookies.refreshToken;
-    
-    if (!refreshToken) {
-      return res.status(401).json({
-        success: false,
-        message: 'Refresh token required',
-        timestamp: new Date().toISOString()
-      });
-    }
-    
-    jwt.verify(refreshToken, JWT_REFRESH_SECRET, (err, decoded) => {
-      if (err) {
-        return res.status(403).json({
-          success: false,
-          message: 'Invalid refresh token',
-          timestamp: new Date().toISOString()
-        });
-      }
-      
-      const accessToken = jwt.sign(
-        { id: decoded.id, email: decoded.email },
-        JWT_ACCESS_SECRET,
-        { expiresIn: '15m' }
-      );
-      
-      res.json({
-        success: true,
-        accessToken,
-        timestamp: new Date().toISOString()
-      });
-    });
-    
-  } catch (err) {
-    console.error('Refresh error:', err);
-    res.status(500).json({
-      success: false,
-      message: 'Server error',
-      timestamp: new Date().toISOString()
-    });
-  }
-});
-
-// Logout endpoint
-app.post('/api/auth/logout', (req, res) => {
-  res.clearCookie('refreshToken');
-  res.json({
-    success: true,
-    message: 'Logout successful',
-    timestamp: new Date().toISOString()
-  });
-});
-
-// User profile endpoint
-app.get('/api/users/profile', authenticateToken, async (req, res) => {
-  try {
-    res.json({
-      success: true,
-      user: {
-        id: req.user.id,
-        email: req.user.email,
-        name: req.user.name,
-        role: req.user.role
-      },
-      timestamp: new Date().toISOString()
-    });
-  } catch (err) {
-    console.error('Profile error:', err);
-    res.status(500).json({
-      success: false,
-      message: 'Server error',
-      timestamp: new Date().toISOString()
-    });
-  }
-});
-
-// Test login endpoint (for debugging)
-app.post('/auth/login', async (req, res) => {
-  console.log('Direct /auth/login called:', req.body);
-  
-  res.json({
-    success: true,
-    message: 'Direct login endpoint (for API Gateway proxy)',
-    user: {
-      id: 1,
-      email: req.body.email || 'test@example.com',
-      name: 'Test User'
-    },
-    token: 'direct-login-token',
-    timestamp: new Date().toISOString()
   });
 });
 
@@ -492,50 +588,84 @@ app.use('*', (req, res) => {
   res.status(404).json({
     success: false,
     message: 'Route not found',
-    requested: req.originalUrl,
-    timestamp: new Date().toISOString(),
-    availableRoutes: [
-      '/',
-      '/health',
-      '/api/auth/login',
-      '/api/auth/register',
-      '/api/auth/refresh',
-      '/api/auth/logout',
-      '/api/users/profile'
-    ]
+    requestedPath: req.originalUrl,
+    timestamp: new Date().toISOString()
   });
 });
 
 // Global error handler
 app.use((err, req, res, next) => {
-  console.error('Global error:', err);
-  res.status(500).json({
+  console.error(`🔥 [${req.requestId || 'NO_ID'}] Global error:`, err.stack);
+  
+  // Regjistro error metrikë
+  userLoginsCounter.labels('unknown', 'error').inc();
+  
+  res.status(err.status || 500).json({
     success: false,
     message: 'Internal server error',
-    timestamp: new Date().toISOString()
+    error: process.env.NODE_ENV === 'development' ? err.message : undefined,
+    timestamp: new Date().toISOString(),
+    requestId: req.requestId
   });
 });
 
-// ==================== SERVER STARTUP ====================
+// ==================== SERVER START ====================
+
 const startServer = async () => {
   try {
+    await initializeServices();
+    
     const startPort = parseInt(process.env.PORT) || 5003;
+    
+    const getAvailablePort = (port) => {
+      return new Promise((resolve, reject) => {
+        const server = net.createServer();
+        server.once('error', (err) => {
+          if (err.code === 'EADDRINUSE') {
+            resolve(getAvailablePort(port + 1));
+          } else {
+            reject(err);
+          }
+        });
+        server.once('listening', () => {
+          server.close(() => resolve(port));
+        });
+        server.listen(port);
+      });
+    };
+    
     const PORT = await getAvailablePort(startPort);
     
     app.listen(PORT, () => {
-      console.log(`🚀 User Service running on port ${PORT}`);
-      console.log(`🌐 CORS enabled for: ${process.env.FRONTEND_URL || 'http://localhost:5173'}`);
-      console.log(`📍 Health: http://localhost:${PORT}/health`);
-      console.log(`🔐 Login: POST http://localhost:${PORT}/api/auth/login`);
-      console.log(`📄 Test: GET http://localhost:${PORT}/api/test`);
+      console.log(`
+==============================================
+🚀 USER SERVICE STARTED SUCCESSFULLY
+==============================================
+📍 Port: ${PORT}
+📍 Health: http://localhost:${PORT}/health
+📊 Metrics: http://localhost:${PORT}/metrics
+🔐 Auth: http://localhost:${PORT}/api/auth/
+👑 Admin: http://localhost:${PORT}/api/admin/users
+🍪 Debug: http://localhost:${PORT}/api/debug/cookies
+📈 Monitoring: Prometheus + Grafana integrated
+💾 Cache: ${cacheManager.isRedisAvailable() ? 'Redis' : 'Memory'}
+==============================================
+`);
+      
+      // Print metrics info
+      console.log('\n📊 Custom Metrics Available:');
+      console.log('  - user_registrations_total');
+      console.log('  - user_logins_total');
+      console.log('  - active_sessions');
+      console.log('  - http_request_duration_seconds');
     });
-    
-    return PORT;
   } catch (error) {
-    console.error('Failed to start server:', error);
+    console.error('❌ Failed to start server:', error);
     process.exit(1);
   }
 };
 
-// Start the server
-startServer().catch(console.error);
+// Start server
+startServer();
+
+module.exports = app; // Për testing

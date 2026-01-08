@@ -1,3 +1,4 @@
+version: '3.8'
 
 services:
   # Database
@@ -5,23 +6,22 @@ services:
     image: mysql:8.0
     container_name: tech-store-mysql
     environment:
-      MYSQL_ROOT_PASSWORD: root
+      MYSQL_ROOT_PASSWORD: rootpassword
       MYSQL_DATABASE: TechProductDB
       MYSQL_USER: techuser
       MYSQL_PASSWORD: techpassword
     ports:
-      - "3307:3306"
+      - "3306:3306"
     volumes:
       - mysql_data:/var/lib/mysql
       - ./init.sql:/docker-entrypoint-initdb.d/init.sql
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+      timeout: 20s
+      retries: 10
+      start_period: 40s
     networks:
       - tech-store-network
-    restart: unless-stopped
 
   # Redis
   redis:
@@ -34,47 +34,47 @@ services:
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
-      timeout: 5s
+      timeout: 3s
       retries: 5
     networks:
       - tech-store-network
-    restart: unless-stopped
 
-  # Kafka Cluster - SIMPLIFIED WITHOUT HEALTHCHECK DEPENDENCY
+  # Kafka Cluster
   zookeeper:
-    image: confluentinc/cp-zookeeper:7.9.1  # Specific version instead of latest
+    image: confluentinc/cp-zookeeper:latest
     container_name: zookeeper
     environment:
       ZOOKEEPER_CLIENT_PORT: 2181
       ZOOKEEPER_TICK_TIME: 2000
-      ZOOKEEPER_INIT_LIMIT: 5
-      ZOOKEEPER_SYNC_LIMIT: 2
     ports:
       - "2181:2181"
     networks:
       - tech-store-network
-    restart: unless-stopped
 
   kafka:
-    image: confluentinc/cp-kafka:7.9.1  # Specific version instead of latest
+    image: confluentinc/cp-kafka:latest
     container_name: kafka
     depends_on:
-      - zookeeper  # Simple dependency without healthcheck
+      - zookeeper
     ports:
       - "9092:9092"
-      - "9094:9094"
+      - "9093:9093"
     environment:
       KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092,PLAINTEXT_HOST://localhost:9094
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:9093
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
       KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
-      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+    healthcheck:
+      test: ["CMD", "kafka-topics", "--list", "--bootstrap-server", "localhost:9092"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
     networks:
       - tech-store-network
-    restart: unless-stopped
 
   kafka-ui:
     image: provectuslabs/kafka-ui:latest
@@ -89,30 +89,30 @@ services:
       KAFKA_CLUSTERS_0_ZOOKEEPER: zookeeper:2181
     networks:
       - tech-store-network
-    restart: unless-stopped
 
   # Microservices
   user-service:
-    build:
-      context: ./services/user-service
+    build: 
+      context: ./user-service
       dockerfile: Dockerfile
-    container_name: backend-user-service
+    container_name: user-service
     ports:
       - "5003:5003"
     environment:
-      DB_HOST: mysql
-      DB_USER: root
-      DB_PASSWORD: root
-      DB_NAME: TechProductDB
-      REDIS_URL: redis://redis:6379
-      KAFKA_BROKERS: kafka:9092
-      JWT_SECRET: your_super_secure_jwt_secret_2024
-      PORT: 5003
-      NODE_ENV: development
+      - DB_HOST=mysql
+      - DB_USER=root
+      - DB_PASSWORD=rootpassword
+      - DB_NAME=TechProductDB
+      - REDIS_URL=redis://redis:6379
+      - KAFKA_BROKERS=kafka:9092
+      - JWT_SECRET=your_super_secure_jwt_secret_2024
+      - NODE_ENV=production
     depends_on:
       mysql:
         condition: service_healthy
       redis:
+        condition: service_healthy
+      kafka:
         condition: service_healthy
     networks:
       - tech-store-network
@@ -120,20 +120,19 @@ services:
 
   product-service:
     build:
-      context: ./services/product-service
+      context: ./product-service
       dockerfile: Dockerfile
-    container_name: backend-product-service
+    container_name: product-service
     ports:
       - "5001:5001"
     environment:
-      DB_HOST: mysql
-      DB_USER: root
-      DB_PASSWORD: root
-      DB_NAME: TechProductDB
-      REDIS_URL: redis://redis:6379
-      KAFKA_BROKERS: kafka:9092
-      PORT: 5001
-      NODE_ENV: development
+      - DB_HOST=mysql
+      - DB_USER=root
+      - DB_PASSWORD=rootpassword
+      - DB_NAME=TechProductDB
+      - REDIS_URL=redis://redis:6379
+      - KAFKA_BROKERS=kafka:9092
+      - NODE_ENV=production
     depends_on:
       mysql:
         condition: service_healthy
@@ -145,20 +144,19 @@ services:
 
   order-service:
     build:
-      context: ./services/order-service
+      context: ./order-service
       dockerfile: Dockerfile
-    container_name: backend-order-service
+    container_name: order-service
     ports:
       - "5002:5002"
     environment:
-      DB_HOST: mysql
-      DB_USER: root
-      DB_PASSWORD: root
-      DB_NAME: TechProductDB
-      REDIS_URL: redis://redis:6379
-      KAFKA_BROKERS: kafka:9092
-      PORT: 5002
-      NODE_ENV: development
+      - DB_HOST=mysql
+      - DB_USER=root
+      - DB_PASSWORD=rootpassword
+      - DB_NAME=TechProductDB
+      - REDIS_URL=redis://redis:6379
+      - KAFKA_BROKERS=kafka:9092
+      - NODE_ENV=production
     depends_on:
       mysql:
         condition: service_healthy
@@ -170,19 +168,18 @@ services:
 
   admin-service:
     build:
-      context: ./services/admin-service
+      context: ./admin-service
       dockerfile: Dockerfile
-    container_name: backend-admin-service
+    container_name: admin-service
     ports:
       - "5004:5004"
     environment:
-      DB_HOST: mysql
-      DB_USER: root
-      DB_PASSWORD: root
-      DB_NAME: TechProductDB
-      REDIS_URL: redis://redis:6379
-      PORT: 5004
-      NODE_ENV: development
+      - DB_HOST=mysql
+      - DB_USER=root
+      - DB_PASSWORD=rootpassword
+      - DB_NAME=TechProductDB
+      - REDIS_URL=redis://redis:6379
+      - NODE_ENV=production
     depends_on:
       mysql:
         condition: service_healthy
@@ -194,19 +191,19 @@ services:
 
   api-gateway:
     build:
-      context: ./services/api-gateway
+      context: ./api-gateway
       dockerfile: Dockerfile
-    container_name: backend-api-gateway
+    container_name: api-gateway
     ports:
       - "3000:3000"
     environment:
-      USER_SERVICE_URL: http://backend-user-service:5003
-      PRODUCT_SERVICE_URL: http://backend-product-service:5001
-      ORDER_SERVICE_URL: http://backend-order-service:5002
-      ADMIN_SERVICE_URL: http://backend-admin-service:5004
-      FRONTEND_URL: http://localhost:5173
-      PORT: 3000
-      NODE_ENV: development
+      - USER_SERVICE_URL=http://user-service:5003
+      - PRODUCT_SERVICE_URL=http://product-service:5001
+      - ORDER_SERVICE_URL=http://order-service:5002
+      - ADMIN_SERVICE_URL=http://admin-service:5004
+      - NOTIFICATION_SERVICE_URL=http://notification-service:5005
+      - ANALYTICS_SERVICE_URL=http://analytics-service:5006
+      - NODE_ENV=production
     depends_on:
       - user-service
       - product-service
@@ -218,7 +215,9 @@ services:
 
 volumes:
   mysql_data:
+    driver: local
   redis_data:
+    driver: local
 
 networks:
   tech-store-network:

@@ -1,5 +1,5 @@
 import React, { useEffect } from "react";
-import { quickSessionCheck, getCurrentUser } from "../../services/authService"; // ✅ Only import these
+import { quickSessionCheck } from "../../services/authService";
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { 
@@ -17,13 +17,14 @@ import {
 } from "../../services/captchaService";
 import { validateDataQuality } from "../../services/validationService";
 import { publishKafkaEvent } from "../../services/eventService";
+import { login as authLogin, validateSession, getCurrentUser } from "../../services/authService"; // ✅ Ndrysho këtu
 import { API_URL } from "../../utils/constants";
-import { useAuth } from '../../contexts/AuthContext';
+import { useAuth } from '../../contexts/AuthContext'; // Shto këtë import
 
 const Login = () => {
   const navigate = useNavigate();
   const { startSpan, endSpan } = useTelemetry();
-  const { login: authContextLogin } = useAuth();
+    const { login: authContextLogin } = useAuth(); // ✅ Shto këtë
 
   const [formData, setFormData] = useState({
     identifier: "",
@@ -132,100 +133,100 @@ const Login = () => {
   };
 
   const handleSubmit = async (e) => {
-    e.preventDefault();
-    const span = startSpan("login_submit");
+  e.preventDefault();
+  const span = startSpan("login_submit");
 
-    // Validate form
-    if (!validateForm()) {
-      endSpan(span, "error");
-      return;
-    }
+  // Validate form
+  if (!validateForm()) {
+    endSpan(span, "error");
+    return;
+  }
 
-    setLoading(true);
+  setLoading(true);
 
-    try {
-      console.log('🔐 [Login.jsx] Attempting login with:', formData.identifier);
+  try {
+    console.log('🔐 Attempting login with:', formData.identifier);
+    
+    // ✅ Përdor login nga AuthContext (jo direkt nga authService)
+    const user = await authContextLogin(formData.identifier, formData.password);
+    
+    console.log('✅ Login successful, user:', user);
+    
+    toast.success(
+      <div className="flex items-center">
+        <FiCheckCircle className="mr-2" />
+        U kyçet me sukses! Mirë se vini përsëri.
+      </div>
+    );
+
+    endSpan(span, "success");
+
+    // Reset form
+    setFormData({
+      identifier: "",
+      password: ""
+    });
+
+    // ✅ REDIREKTIMI
+    setTimeout(() => {
+      console.log('🔄 Redirecting user with role:', user.role);
       
-      // ✅ Përdor VETËM authContextLogin
-      const user = await authContextLogin(formData.identifier, formData.password);
-      
-      console.log('✅ [Login.jsx] Login successful, user:', user);
-      
-      toast.success(
-        <div className="flex items-center">
-          <FiCheckCircle className="mr-2" />
-          U kyçet me sukses! Mirë se vini përsëri.
-        </div>
-      );
-
-      endSpan(span, "success");
-
-      // Reset form
-      setFormData({
-        identifier: "",
-        password: ""
-      });
-
-      // ✅ REDIREKTIMI
-      setTimeout(() => {
-        console.log('🔄 Redirecting user with role:', user.role);
-        
-        if (user.role === 'admin' || user.role === 'administrator') {
-          console.log('🚀 Redirecting to admin dashboard');
-          navigate("/admin/dashboard");
-        } else {
-          console.log('🏠 Redirecting to homepage');
-          navigate("/");
-        }
-      }, 1500);
-
-    } catch (err) {
-      console.error("❌ [Login.jsx] Login error:", err);
-      
-      const errorMessages = {
-        "Failed to fetch": "Nuk mund të lidhet me serverin. Kontrollo lidhjen tuaj me internet.",
-        "Invalid credentials": "Email/username ose fjalëkalim i gabuar",
-        "User not found": "Përdoruesi nuk ekziston",
-        "Account locked": "Llogaria është bllokuar përkohësisht",
-        "HTTP 401": "Kredenciale të pavlefshme",
-        "HTTP 429": "Shumë tentativa. Ju lutem prisni 15 minuta para se të provoni përsëri.",
-        "HTTP 500": "Gabim në server. Provo përsëri më vonë.",
-        "Session expired": "Session ka skaduar. Ju lutem kyçuni përsëri.",
-        "Too many login attempts": "Shumë tentativa të dështuara. Prisni 15 minuta."
-      };
-
-      let errorMessage = errorMessages[err.message] || err.message || "Gabim gjatë kyçjes";
-
-      // Nëse është 429, trego një mesazh më të qartë
-      if (err.message.includes('429') || err.message.includes('Too many')) {
-        errorMessage = "🛑 SHUMË TENTATIVA! Llogaria juaj është bllokuar përkohësisht për 15 minuta për shkak të tentativave të shumta të dështuara.";
-        
-        toast.error(
-          <div className="space-y-2">
-            <div className="flex items-center">
-              <FiAlertCircle className="mr-2" />
-              <span className="font-bold">Llogaria e Bllokuar</span>
-            </div>
-            <div className="text-sm pl-6">
-              <p>• Shumë tentativa të dështuara të kyçjes</p>
-              <p>• Bllokimi zgjat 15 minuta</p>
-              <p>• Kontaktoni administratorin nëse është gabim</p>
-            </div>
-          </div>,
-          { autoClose: 10000 }
-        );
+      if (user.role === 'admin' || user.role === 'administrator') {
+        console.log('🚀 Redirecting to admin dashboard');
+        navigate("/admin/dashboard");
       } else {
-        // Gabime të tjera
-        toast.error(
-          <div className="flex items-center">
-            <FiAlertCircle className="mr-2" />
-            {errorMessage}
-          </div>
-        );
+        console.log('🏠 Redirecting to homepage');
+        navigate("/");
       }
+    }, 1500);
 
-      endSpan(span, "error");
-    } finally {
+    }catch (err) {
+  console.error("❌ Login error:", err);
+  
+  const errorMessages = {
+    "Failed to fetch": "Nuk mund të lidhet me serverin. Kontrollo lidhjen tuaj me internet.",
+    "Invalid credentials": "Email/username ose fjalëkalim i gabuar",
+    "User not found": "Përdoruesi nuk ekziston",
+    "Account locked": "Llogaria është bllokuar përkohësisht",
+    "HTTP 401": "Kredenciale të pavlefshme",
+    "HTTP 429": "Shumë tentativa. Ju lutem prisni 15 minuta para se të provoni përsëri.",
+    "HTTP 500": "Gabim në server. Provo përsëri më vonë.",
+    "Session expired": "Session ka skaduar. Ju lutem kyçuni përsëri.",
+    "Too many login attempts": "Shumë tentativa të dështuara. Prisni 15 minuta."
+  };
+
+  let errorMessage = errorMessages[err.message] || err.message || "Gabim gjatë kyçjes";
+
+  // Nëse është 429, trego një mesazh më të qartë
+  if (err.message.includes('429') || err.message.includes('Too many')) {
+    errorMessage = "🛑 SHUMË TENTATIVA! Llogaria juaj është bllokuar përkohësisht për 15 minuta për shkak të tentativave të shumta të dështuara.";
+    
+    toast.error(
+      <div className="space-y-2">
+        <div className="flex items-center">
+          <FiAlertCircle className="mr-2" />
+          <span className="font-bold">Llogaria e Bllokuar</span>
+        </div>
+        <div className="text-sm pl-6">
+          <p>• Shumë tentativa të dështuara të kyçjes</p>
+          <p>• Bllokimi zgjat 15 minuta</p>
+          <p>• Kontaktoni administratorin nëse është gabim</p>
+        </div>
+      </div>,
+      { autoClose: 10000 }
+    );
+  } else {
+    // Gabime të tjera
+    toast.error(
+      <div className="flex items-center">
+        <FiAlertCircle className="mr-2" />
+        {errorMessage}
+      </div>
+    );
+  }
+
+  // ... rest of error handling
+}finally {
       setLoading(false);
     }
   };
@@ -239,7 +240,7 @@ const Login = () => {
     try {
       console.log('🔗 Testing backend connection...');
       
-      const corsTest = await fetch(`${API_URL}`, {
+      const corsTest = await fetch(`${API_URL}/api/test-cors`, {
         method: 'GET',
         credentials: 'include'
       });
@@ -270,63 +271,72 @@ const Login = () => {
     }
   };
 
-  useEffect(() => {
-    let isMounted = true;
-    let isChecking = false;
+ // Në Login.jsx - në useEffect për kontrollin e sesionit
+useEffect(() => {
+  let isMounted = true;
+  let isChecking = false;
+  
+  const checkExistingSession = async () => {
+    // Nëse AuthContext tashmë po kontrollon, mos e bëj
+    if (isChecking || !isMounted) return;
     
-    const checkExistingSession = async () => {
-      if (isChecking || !isMounted) return;
+    isChecking = true;
+    
+    try {
+      console.log('🔍 Login.jsx: Checking existing session...');
       
-      isChecking = true;
+      // Përdor quickSessionCheck në vend të validateSession
+      // Kjo është më e lehtë dhe nuk ka cooldown
+      const isValid = await quickSessionCheck();
       
-      try {
-        console.log('🔍 Login.jsx: Checking existing session...');
+      if (!isMounted) return;
+      
+      if (isValid) {
+        console.log('✅ Login.jsx: User already logged in');
         
-        const isValid = await quickSessionCheck();
-        
-        if (!isMounted) return;
-        
-        if (isValid) {
-          console.log('✅ Login.jsx: User already logged in');
+        try {
+          // Merr profilin e përdoruesit
+          const profile = await getCurrentUser();
           
-          try {
-            const profile = await getCurrentUser();
-            
-            if (!isMounted) return;
-            
-            if (profile && (profile.role === 'admin' || profile.role === 'administrator')) {
-              navigate("/admin/dashboard");
-            } else {
-              navigate("/");
-            }
-          } catch (profileError) {
-            console.warn('⚠️ Could not fetch user profile:', profileError);
-            if (isMounted) {
-              navigate("/");
-            }
+          if (!isMounted) return;
+          
+          // Ridrejto sipas rolit
+          if (profile && (profile.role === 'admin' || profile.role === 'administrator')) {
+            navigate("/admin/dashboard");
+          } else {
+            navigate("/");
           }
-        } else {
-          console.log('ℹ️ Login.jsx: No active session found - showing login form');
+        } catch (profileError) {
+          console.warn('⚠️ Could not fetch user profile:', profileError);
+          // Nëse nuk mund të marrësh profilin, ridrejto në homepage
+          if (isMounted) {
+            navigate("/");
+          }
         }
-      } catch (error) {
-        console.log('ℹ️ Login.jsx: Session check error:', error.message);
-      } finally {
-        if (isMounted) {
-          isChecking = false;
-        }
+      } else {
+        console.log('ℹ️ Login.jsx: No active session found - showing login form');
+        // Nuk ka sesion, trego formën e login
       }
-    };
-    
-    const timer = setTimeout(() => {
-      checkExistingSession();
-    }, 500);
-    
-    return () => {
-      isMounted = false;
-      clearTimeout(timer);
-    };
-  }, [navigate]);
-
+    } catch (error) {
+      console.log('ℹ️ Login.jsx: Session check error:', error.message);
+      // Nëse ka error, trego formën e login
+    } finally {
+      if (isMounted) {
+        isChecking = false;
+      }
+    }
+  };
+  
+  // Shto një delay për të parandaluar race condition me AuthContext
+  const timer = setTimeout(() => {
+    checkExistingSession();
+  }, 500); // 500ms delay
+  
+  return () => {
+    isMounted = false;
+    clearTimeout(timer);
+  };
+}, [navigate]); // Kthehet në array bosh për të ekzekutuar vetëm një herë
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 py-8 px-4">
       <div className="max-w-2xl mx-auto">
@@ -343,8 +353,8 @@ const Login = () => {
             Mirë se vini përsëri. Shkruani kredencialet tuaja për të vazhduar.
           </p>
           
-          {/* Debug button */}
-          {import.meta.env.DEV && (
+          {/* Debug button (vetëm në development) */}
+          {process.env.NODE_ENV === 'development' && (
             <button
               onClick={testBackendConnection}
               className="mt-4 px-4 py-2 text-sm bg-yellow-100 text-yellow-800 rounded-lg hover:bg-yellow-200 transition"

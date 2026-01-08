@@ -20,15 +20,16 @@ const CategoriesManagement = () => {
     description: '',
     is_active: true
   });
+
+  const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5002';
   
   // Fetch all categories
   const fetchCategories = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`/api/categories`, {
-        credentials: 'include',
+      const response = await fetch(`${API_BASE_URL}/api/categories`, {
         headers: {
-          'Content-Type': 'application/json'
+          'Authorization': `Bearer ${localStorage.getItem('adminToken')}`
         }
       });
       
@@ -37,24 +38,9 @@ const CategoriesManagement = () => {
       const data = await response.json();
       if (data.success) {
         setCategories(data.data || []);
-      } else {
-        // Fallback mock data
-        setCategories([
-          { id: 1, name: 'Electronics', description: 'Electronic devices', is_active: true, created_at: new Date().toISOString() },
-          { id: 2, name: 'Computers', description: 'Computers and accessories', is_active: true, created_at: new Date().toISOString() },
-          { id: 3, name: 'Mobile', description: 'Mobile phones', is_active: true, created_at: new Date().toISOString() },
-          { id: 4, name: 'Accessories', description: 'Accessories for devices', is_active: false, created_at: new Date().toISOString() },
-          { id: 5, name: 'Audio', description: 'Audio equipment', is_active: true, created_at: new Date().toISOString() },
-        ]);
       }
     } catch (error) {
       console.error('Error fetching categories:', error);
-      // Fallback mock data
-      setCategories([
-        { id: 1, name: 'Electronics', description: 'Electronic devices', is_active: true, created_at: new Date().toISOString() },
-        { id: 2, name: 'Computers', description: 'Computers and accessories', is_active: true, created_at: new Date().toISOString() },
-        { id: 3, name: 'Mobile', description: 'Mobile phones', is_active: true, created_at: new Date().toISOString() },
-      ]);
       toast.error('Could not load categories');
     } finally {
       setLoading(false);
@@ -87,12 +73,12 @@ const CategoriesManagement = () => {
   const handleAddCategory = async (e) => {
     e.preventDefault();
     try {
-      const response = await fetch(`/api/categories`, {
+      const response = await fetch(`${API_BASE_URL}/api/categories`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('adminToken')}`
         },
-        credentials: 'include',
         body: JSON.stringify(formData)
       });
 
@@ -108,33 +94,20 @@ const CategoriesManagement = () => {
       }
     } catch (error) {
       console.error('Error adding category:', error);
-      // Simulate success for demo
-      toast.success('Category added successfully (demo)');
-      setShowAddModal(false);
-      setFormData({ name: '', description: '', is_active: true });
-      
-      // Add to local state for demo
-      const newCategory = {
-        id: categories.length + 1,
-        ...formData,
-        created_at: new Date().toISOString()
-      };
-      setCategories(prev => [...prev, newCategory]);
+      toast.error(error.message || 'Failed to add category');
     }
   };
 
   // Edit category
   const handleEditCategory = async (e) => {
     e.preventDefault();
-    if (!selectedCategory) return;
-    
     try {
-      const response = await fetch(`/api/categories/${selectedCategory.id}`, {
+      const response = await fetch(`${API_BASE_URL}/api/categories/${selectedCategory.id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('adminToken')}`
         },
-        credentials: 'include',
         body: JSON.stringify(formData)
       });
 
@@ -151,18 +124,7 @@ const CategoriesManagement = () => {
       }
     } catch (error) {
       console.error('Error updating category:', error);
-      // Simulate success for demo
-      toast.success('Category updated successfully (demo)');
-      setShowEditModal(false);
-      setSelectedCategory(null);
-      setFormData({ name: '', description: '', is_active: true });
-      
-      // Update local state for demo
-      setCategories(prev => prev.map(cat => 
-        cat.id === selectedCategory.id 
-          ? { ...cat, ...formData }
-          : cat
-      ));
+      toast.error(error.message || 'Failed to update category');
     }
   };
 
@@ -171,9 +133,11 @@ const CategoriesManagement = () => {
     if (!window.confirm('Are you sure you want to deactivate this category?')) return;
 
     try {
-      const response = await fetch(`/api/categories/${categoryId}`, {
+      const response = await fetch(`${API_BASE_URL}/api/categories/${categoryId}`, {
         method: 'DELETE',
-        credentials: 'include'
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('adminToken')}`
+        }
       });
 
       const data = await response.json();
@@ -186,27 +150,19 @@ const CategoriesManagement = () => {
       }
     } catch (error) {
       console.error('Error deleting category:', error);
-      // Simulate success for demo
-      toast.success('Category deactivated successfully (demo)');
-      
-      // Update local state for demo
-      setCategories(prev => prev.map(cat => 
-        cat.id === categoryId 
-          ? { ...cat, is_active: false }
-          : cat
-      ));
+      toast.error(error.message || 'Failed to deactivate category');
     }
   };
 
   // Activate category
   const handleActivateCategory = async (categoryId) => {
     try {
-      const response = await fetch(`/api/categories/${categoryId}`, {
+      const response = await fetch(`${API_BASE_URL}/api/categories/${categoryId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('adminToken')}`
         },
-        credentials: 'include',
         body: JSON.stringify({ is_active: true })
       });
 
@@ -220,15 +176,7 @@ const CategoriesManagement = () => {
       }
     } catch (error) {
       console.error('Error activating category:', error);
-      // Simulate success for demo
-      toast.success('Category activated successfully (demo)');
-      
-      // Update local state for demo
-      setCategories(prev => prev.map(cat => 
-        cat.id === categoryId 
-          ? { ...cat, is_active: true }
-          : cat
-      ));
+      toast.error(error.message || 'Failed to activate category');
     }
   };
 
@@ -245,16 +193,11 @@ const CategoriesManagement = () => {
 
   // Format date
   const formatDate = (dateString) => {
-    if (!dateString) return 'N/A';
-    try {
-      return new Date(dateString).toLocaleDateString('en-US', {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric'
-      });
-    } catch {
-      return 'N/A';
-    }
+    return new Date(dateString).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    });
   };
 
   // Export to CSV
@@ -278,8 +221,6 @@ const CategoriesManagement = () => {
     a.download = 'categories.csv';
     a.click();
     window.URL.revokeObjectURL(url);
-    
-    toast.success('Categories exported to CSV');
   };
 
   if (loading) {
@@ -343,9 +284,7 @@ const CategoriesManagement = () => {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-gray-600 text-sm">With Products</p>
-              <h3 className="text-2xl font-bold text-gray-900">
-                {categories.filter(c => c.product_count > 0).length || '-'}
-              </h3>
+              <h3 className="text-2xl font-bold text-gray-900">-</h3>
             </div>
             <FiFilter className="text-2xl text-purple-600" />
           </div>
@@ -441,7 +380,7 @@ const CategoriesManagement = () => {
                     <td className="py-4 px-6 text-sm font-medium text-gray-900">{category.id}</td>
                     <td className="py-4 px-6">
                       <div className="flex items-center">
-                        <span className="text-2xl mr-3">📦</span>
+                        <span className="text-2xl mr-3">{category.icon || '📦'}</span>
                         <div>
                           <div className="font-medium text-gray-900">{category.name}</div>
                           <div className="text-sm text-gray-500">Category ID: {category.id}</div>
@@ -506,7 +445,7 @@ const CategoriesManagement = () => {
         </div>
       </div>
 
-      {/* Pagination */}
+      {/* Pagination (optional) */}
       <div className="mt-6 flex items-center justify-between">
         <div className="text-sm text-gray-500">
           Showing {filteredCategories.length} of {categories.length} categories
