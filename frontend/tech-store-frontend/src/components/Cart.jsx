@@ -7,14 +7,24 @@ import { toast } from 'react-toastify';
 const Cart = ({ cartItems, removeFromCart, updateCartQuantity, cartTotal }) => {
   const navigate = useNavigate();
 
-  const handleCheckout = () => {
-    if (cartItems.length === 0) {
-      toast.warning('Your cart is empty!');
-      return;
-    }
-    toast.success('Proceeding to checkout...');
-    // In real app, redirect to checkout page
-  };
+ // Në Cart.jsx, zëvendëso funksionin handleCheckout me:
+const handleCheckout = () => {
+  if (cartItems.length === 0) {
+    toast.warning('Your cart is empty!');
+    return;
+  }
+  
+  // Kontrollo nëse user është i loguar
+  const user = JSON.parse(localStorage.getItem('user'));
+  if (!user) {
+    toast.error('Please login to continue checkout');
+    navigate('/login');
+    return;
+  }
+  
+  // Shko në faqen e checkout
+  navigate('/checkout');
+};
 
   if (cartItems.length === 0) {
     return (
