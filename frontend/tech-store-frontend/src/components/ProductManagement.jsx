@@ -29,6 +29,26 @@ const ProductManagement = () => {
     }
   }, []);
 
+  // Helper function to create SVG fallback
+  const createFallbackSVG = useCallback((width, height, text = 'No Image') => {
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
+      <rect width="${width}" height="${height}" fill="#f3f4f6"/>
+      <circle cx="${width/2}" cy="${height/3}" r="${Math.min(width, height)/6}" fill="#d1d5db"/>
+      <rect x="${width/4}" y="${height/2}" width="${width/2}" height="${height/3}" rx="5" fill="#d1d5db"/>
+      <text x="${width/2}" y="${height/1.7}" font-family="Arial" font-size="${Math.min(width, height)/10}" 
+            fill="#6b7280" text-anchor="middle" dy=".3em">${text}</text>
+    </svg>`;
+    return `data:image/svg+xml;base64,${btoa(svg)}`;
+  }, []);
+
+  // Image error handler
+  const handleImageError = useCallback((e, fallbackText = 'Image Error') => {
+    const { width, height } = e.target;
+    const fallbackSVG = createFallbackSVG(width || 100, height || 100, fallbackText);
+    e.target.src = fallbackSVG;
+    e.target.onerror = null; // Prevent infinite loop
+  }, [createFallbackSVG]);
+
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -273,7 +293,7 @@ const ProductManagement = () => {
     try {
       const updatedProduct = {
         ...productToUpdateImage,
-        image_url: newImageUrl
+        image_url: newImageUrl.trim()
       };
       
       await productService.update(productToUpdateImage.id, updatedProduct);
@@ -287,6 +307,12 @@ const ProductManagement = () => {
       setProductToUpdateImage(null);
       setNewImageUrl('');
     }
+  };
+
+  // Validate image URL format
+  const isValidImageUrl = (url) => {
+    if (!url) return false;
+    return url.match(/^https?:\/\/.+\.(jpg|jpeg|png|gif|webp|svg)(\?.*)?$/i) !== null;
   };
 
   if (loading) {
@@ -427,28 +453,35 @@ const ProductManagement = () => {
               </div>
               
               <div className="mb-6">
-                <label className="block text-sm font-medium mb-2">Image URL</label>
+                <label className="block text-sm font-medium mb-2">
+                  Image URL {!isValidImageUrl(newImageUrl) && newImageUrl && (
+                    <span className="text-red-500 text-xs ml-2">⚠️ May not be a valid image URL</span>
+                  )}
+                </label>
                 <input
                   type="url"
                   value={newImageUrl}
                   onChange={(e) => setNewImageUrl(e.target.value)}
                   className="w-full border rounded px-3 py-2 mb-3"
-                  placeholder="https://example.com/product-image.jpg"
+                  placeholder="https://images.unsplash.com/photo-1511707171634-5f897ff02aa9"
                 />
                 
                 {newImageUrl && (
                   <div className="mt-4">
                     <p className="text-sm text-gray-500 mb-2">Preview:</p>
                     <div className="flex justify-center">
-                      <img
-                        src={newImageUrl}
-                        alt="Preview"
-                        className="w-40 h-40 object-cover rounded-lg border cursor-pointer"
-                        onClick={() => setPreviewImage(newImageUrl)}
-                        onError={(e) => {
-                          e.target.src = 'https://via.placeholder.com/160x160?text=Invalid+Image';
-                        }}
-                      />
+                      <div className="relative">
+                        <img
+                          src={newImageUrl}
+                          alt="Preview"
+                          className="w-40 h-40 object-cover rounded-lg border cursor-pointer"
+                          onClick={() => setPreviewImage(newImageUrl)}
+                          onError={(e) => handleImageError(e, 'Invalid Image')}
+                        />
+                        <div className="absolute bottom-0 left-0 right-0 bg-black bg-opacity-50 text-white text-xs p-1 text-center">
+                          Click to enlarge
+                        </div>
+                      </div>
                     </div>
                   </div>
                 )}
@@ -458,7 +491,7 @@ const ProductManagement = () => {
                 <button 
                   onClick={handleUpdateImage}
                   className="flex-1 bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition-colors duration-200"
-                  disabled={!newImageUrl}
+                  disabled={!newImageUrl.trim()}
                 >
                   Update Image
                 </button>
@@ -479,8 +512,13 @@ const ProductManagement = () => {
                 <ul className="list-disc pl-4 mt-1">
                   <li>Unsplash: https://images.unsplash.com/...</li>
                   <li>Cloudinary: https://res.cloudinary.com/...</li>
-                  <li>Any valid image URL</li>
+                  <li>Imgur: https://i.imgur.com/...</li>
+                  <li>Any valid image URL ending with .jpg, .png, .gif, .webp</li>
                 </ul>
+                <p className="mt-2">✅ Valid URL examples:</p>
+                <code className="block text-xs bg-gray-100 p-2 rounded mt-1 truncate">
+                  https://images.unsplash.com/photo-1511707171634-5f897ff02aa9
+                </code>
               </div>
             </div>
           </div>
@@ -510,7 +548,6 @@ const ProductManagement = () => {
               </div>
 
               <form onSubmit={handleSubmit} className="space-y-4">
-                {/* ... (form inputs remain the same) ... */}
                 {/* Product Name */}
                 <div>
                   <label className="block text-sm font-medium mb-1">
@@ -599,33 +636,32 @@ const ProductManagement = () => {
                 {/* Image URL me preview */}
                 <div>
                   <label className="block text-sm font-medium mb-1">
-                    Image URL (optional)
+                    Image URL (optional) {formData.image_url && !isValidImageUrl(formData.image_url) && (
+                      <span className="text-red-500 text-xs ml-2">⚠️ May not be a valid image URL</span>
+                    )}
                   </label>
                   <input
                     type="url"
                     value={formData.image_url}
-                    onChange={(e) => {
-                      const url = e.target.value;
-                      if (url && !url.match(/^https?:\/\/.+\.(jpg|jpeg|png|gif|webp)(\?.*)?$/i)) {
-                        console.warn('URL might not be a valid image');
-                      }
-                      setFormData({...formData, image_url: url});
-                    }}
+                    onChange={(e) => setFormData({...formData, image_url: e.target.value})}
                     className="w-full border rounded px-3 py-2"
-                    placeholder="https://example.com/product-image.jpg"
+                    placeholder="https://images.unsplash.com/photo-1511707171634-5f897ff02aa9"
                   />
                   {formData.image_url && (
                     <div className="mt-2">
                       <p className="text-xs text-gray-500 mb-1">Preview:</p>
-                      <img
-                        src={formData.image_url}
-                        alt="Preview"
-                        className="w-20 h-20 object-cover rounded border cursor-pointer"
-                        onClick={() => setPreviewImage(formData.image_url)}
-                        onError={(e) => {
-                          e.target.src = 'https://via.placeholder.com/80x80?text=Invalid+URL';
-                        }}
-                      />
+                      <div className="relative inline-block">
+                        <img
+                          src={formData.image_url}
+                          alt="Preview"
+                          className="w-20 h-20 object-cover rounded border cursor-pointer"
+                          onClick={() => setPreviewImage(formData.image_url)}
+                          onError={(e) => handleImageError(e, 'Invalid URL')}
+                        />
+                        <div className="absolute bottom-0 left-0 right-0 bg-black bg-opacity-50 text-white text-xs p-1 text-center">
+                          Click to enlarge
+                        </div>
+                      </div>
                     </div>
                   )}
                 </div>
@@ -679,14 +715,14 @@ battery: 5000mAh"
             >
               ×
             </button>
-            <img
-              src={previewImage}
-              alt="Product Preview"
-              className="w-full h-auto max-h-[85vh] object-contain rounded-lg"
-              onError={(e) => {
-                e.target.src = 'https://via.placeholder.com/800x600?text=Image+Not+Found';
-              }}
-            />
+            <div className="p-2">
+              <img
+                src={previewImage}
+                alt="Product Preview"
+                className="w-full h-auto max-h-[80vh] object-contain rounded-lg"
+                onError={(e) => handleImageError(e, 'Image Not Found')}
+              />
+            </div>
           </div>
         </div>
       )}
@@ -731,10 +767,7 @@ battery: 5000mAh"
                           alt={product.name}
                           className="w-12 h-12 object-cover rounded border cursor-pointer hover:opacity-90 transition-opacity duration-200"
                           onClick={() => setPreviewImage(product.image_url)}
-                          onError={(e) => {
-                            e.target.src = 'https://via.placeholder.com/48x48/cccccc/969696?text=Error';
-                            e.target.className = 'w-12 h-12 bg-gray-100 rounded border';
-                          }}
+                          onError={(e) => handleImageError(e, 'No Image')}
                         />
                         {/* Tooltip për preview hover */}
                         <div className="absolute hidden group-hover:block z-10 bottom-full left-1/2 transform -translate-x-1/2 mb-2">
@@ -743,20 +776,26 @@ battery: 5000mAh"
                               src={product.image_url}
                               alt={product.name}
                               className="w-32 h-32 object-cover rounded"
-                              onError={(e) => {
-                                e.target.src = 'https://via.placeholder.com/128x128?text=Image+Error';
-                              }}
+                              onError={(e) => handleImageError(e, 'No Image')}
                             />
                           </div>
                         </div>
                       </div>
                     ) : (
                       <div 
-                        className="w-12 h-12 bg-gray-100 rounded border flex items-center justify-center cursor-pointer hover:bg-gray-200 transition-colors duration-200"
+                        className="w-12 h-12 bg-gray-100 rounded border flex items-center justify-center cursor-pointer hover:bg-gray-200 transition-colors duration-200 group"
                         onClick={() => handleAddImageClick(product)}
                         title="Click to add image"
                       >
                         <span className="text-gray-400 text-xs">+ Add</span>
+                        {/* Tooltip */}
+                        <div className="absolute hidden group-hover:block z-10 bottom-full left-1/2 transform -translate-x-1/2 mb-2 w-48">
+                          <div className="bg-white p-3 rounded shadow-lg border">
+                            <p className="text-sm font-medium mb-2">Add Product Image</p>
+                            <p className="text-xs text-gray-600">Click to add or update image for this product.</p>
+                            <p className="text-xs text-gray-500 mt-1">Supports: JPG, PNG, GIF, WebP</p>
+                          </div>
+                        </div>
                       </div>
                     )}
                   </td>
