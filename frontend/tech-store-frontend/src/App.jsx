@@ -21,6 +21,7 @@ import Users from './components/admin/Users';
 import Products from './components/admin/Products';
 import Cart from './components/Cart';
 import Checkout from './components/Checkout';
+import MyOrders from './components/MyOrders';
 
 import {
   FiShoppingCart,
@@ -460,7 +461,12 @@ const getDefaultImage = () => {
                   </div>
                 } />
               </Route>
-
+              
+              <Route path="/my-orders" element={
+                <ProtectedRoute requireEmailVerification={false}>
+                  <MyOrders />
+                </ProtectedRoute>
+              } />
               {/* Cart Page */}
               <Route path="/cart" element={
                 <CartPage
