@@ -1,0 +1,11 @@
+frontend:
+  build: ./tech-store-frontend
+  container_name: techhub-frontend
+  ports:
+  - "3000:5173" 
+  environment:
+    - VITE_API_URL=http://localhost:8080
+  depends_on:
+    - api-gateway
+  networks:
+    - techhub-network
