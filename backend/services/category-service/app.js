@@ -355,6 +355,10 @@ const authenticateAdmin = async (req, res, next) => {
     if (authHeader && authHeader.startsWith('Bearer ')) {
       token = authHeader.split(' ')[1];
       console.log('Token extracted from header:', token ? 'Yes' : 'No');
+    } else if (req.cookies && req.cookies.accessToken) {
+        // Provo me cookie
+        token = req.cookies.accessToken;
+        console.log('Token extracted from cookie:', token ? 'Yes' : 'No');
     }
     
     // Nëse nuk ka token, kthe error
@@ -371,45 +375,69 @@ const authenticateAdmin = async (req, res, next) => {
     }
 
     const jwt = require('jsonwebtoken');
-    const JWT_SECRET = process.env.JWT_SECRET || 'your_jwt_secret';
     
-    console.log('JWT_SECRET exists:', !!JWT_SECRET);
+    // Lista e sekreteve për të provuar
+    const secretsToTry = [
+      process.env.JWT_ACCESS_SECRET,
+      process.env.JWT_SECRET,
+      'access_secret_default_change_this',
+      'your_super_secure_jwt_secret_2024',
+      'your_super_secure_access_secret_key_here_change_this'
+    ].filter(s => s); // Remove null/undefined/empty
     
-    try {
-      const decoded = jwt.verify(token, JWT_SECRET);
-      console.log('✅ Token decoded successfully');
-      console.log('Decoded token data:', {
-        id: decoded.id,
-        username: decoded.username,
-        role: decoded.role,
-        exp: decoded.exp,
-        expiresIn: new Date(decoded.exp * 1000).toLocaleString()
-      });
-      
-      if (decoded.role !== 'admin') {
-        console.error('❌ User is not admin, role:', decoded.role);
-        return res.status(403).json({
-          success: false,
-          message: 'Admin access required'
-        });
+    // Remove duplicates
+    const uniqueSecrets = [...new Set(secretsToTry)];
+    
+    console.log(`🔐 Attempting verification with ${uniqueSecrets.length} candidates`);
+    
+    let decoded = null;
+    let verified = false;
+    let verificationError = null;
+    
+    for (const secret of uniqueSecrets) {
+      try {
+        decoded = jwt.verify(token, secret);
+        verified = true;
+        console.log('✅ Token verified successfully with a secret candidate');
+        break; // Stop if verified
+      } catch (jwtError) {
+        verificationError = jwtError;
+        // Continue to next secret
       }
-
-      req.user = decoded;
-      console.log('✅ Admin authentication successful');
-      next();
-    } catch (jwtError) {
-      console.error('❌ JWT verification error:', jwtError.message);
+    }
+    
+    if (!verified) {
+      console.error('❌ All secret candidates failed.');
+      throw verificationError || new Error('Token verification failed');
+    }
+      
+    console.log('Decoded token data:', {
+      id: decoded.id,
+      username: decoded.username,
+      role: decoded.role,
+      exp: decoded.exp,
+      expiresIn: new Date(decoded.exp * 1000).toLocaleString()
+    });
+    
+    if (decoded.role !== 'admin') {
+      console.error('❌ User is not admin, role:', decoded.role);
       return res.status(403).json({
         success: false,
-        message: 'Invalid or expired token',
-        error: jwtError.message
+        message: 'Admin access required'
       });
     }
+
+    req.user = decoded;
+    console.log('✅ Admin authentication successful');
+    next();
+
   } catch (err) {
-    console.error('❌ Admin auth error:', err);
+    console.error('❌ Admin auth error details:', err.message);
+    console.error('Stack:', err.stack);
     return res.status(403).json({
       success: false,
-      message: 'Authentication error'
+      message: 'Authentication error',
+      debug: err.message
     });
   }
 };
@@ -538,9 +566,9 @@ app.post('/api/categories', authenticateAdmin, async (req, res) => {
     const { name, description, icon } = req.body;
     
     const [result] = await connection.execute(
-      `INSERT INTO Categories (name, description, icon, is_active)
-       VALUES (?, ?, ?, ?)`,
-      [name, description, icon || getCategoryIcon(name), true]
+      `INSERT INTO Categories (name, description, is_active)
+       VALUES (?, ?, ?)`,
+      [name, description, true]
     );
     
     // Merr kategorinë e sapo krijuar
@@ -578,12 +606,15 @@ app.put('/api/categories/:id', authenticateAdmin, async (req, res) => {
     connection = await pool.getConnection();
     const { id } = req.params;
     const { name, description, icon, is_active } = req.body;
+
+    
+    console.log(`📝 Updating category ${id}`);
     
     const [result] = await connection.execute(
       `UPDATE Categories 
-       SET name = ?, description = ?, icon = ?, is_active = ?
+       SET name = ?, description = ?, is_active = ?
        WHERE id = ?`,
-      [name, description, icon || getCategoryIcon(name), is_active, id]
+      [name, description, is_active, id]
     );
     
     if (result.affectedRows === 0) {
@@ -610,10 +641,12 @@ app.put('/api/categories/:id', authenticateAdmin, async (req, res) => {
       message: 'Category updated successfully'
     });
   } catch (err) {
-    console.error('Update category error:', err);
+    console.error('❌ Update category error details:', err.message);
+    console.error('Stack:', err.stack);
     res.status(500).json({
       success: false,
-      message: 'Server error'
+      message: 'Server error',
+      debug: err.message
     });
   } finally {
     if (connection) connection.release();

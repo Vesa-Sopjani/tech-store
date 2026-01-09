@@ -21,16 +21,14 @@ const CategoriesManagement = () => {
     is_active: true
   });
 
-  const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5002';
+  const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5005';
   
   // Fetch all categories
   const fetchCategories = async () => {
     try {
       setLoading(true);
       const response = await fetch(`${API_BASE_URL}/api/categories`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('adminToken')}`
-        }
+        credentials: 'include'
       });
       
       if (!response.ok) throw new Error('Failed to fetch categories');
@@ -76,9 +74,9 @@ const CategoriesManagement = () => {
       const response = await fetch(`${API_BASE_URL}/api/categories`, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('adminToken')}`
+          'Content-Type': 'application/json'
         },
+        credentials: 'include',
         body: JSON.stringify(formData)
       });
 
@@ -105,9 +103,9 @@ const CategoriesManagement = () => {
       const response = await fetch(`${API_BASE_URL}/api/categories/${selectedCategory.id}`, {
         method: 'PUT',
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('adminToken')}`
+          'Content-Type': 'application/json'
         },
+        credentials: 'include',
         body: JSON.stringify(formData)
       });
 
@@ -135,9 +133,7 @@ const CategoriesManagement = () => {
     try {
       const response = await fetch(`${API_BASE_URL}/api/categories/${categoryId}`, {
         method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('adminToken')}`
-        }
+        credentials: 'include'
       });
 
       const data = await response.json();
@@ -160,9 +156,9 @@ const CategoriesManagement = () => {
       const response = await fetch(`${API_BASE_URL}/api/categories/${categoryId}`, {
         method: 'PUT',
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('adminToken')}`
+          'Content-Type': 'application/json'
         },
+        credentials: 'include',
         body: JSON.stringify({ is_active: true })
       });
 
