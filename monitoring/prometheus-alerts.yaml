@@ -1,0 +1,253 @@
+# Prometheus Alerting Rules për auto-healing dhe monitoring
+# Këto alerts aktivizohen kur ka probleme me shërbimet
+
+groups:
+  - name: techstore_alerts
+    interval: 30s
+    rules:
+      # ==================== HIGH ERROR RATE ====================
+      - alert: HighErrorRate
+        expr: |
+          rate(istio_requests_total{
+            response_code=~"5..",
+            destination_service_namespace="techstore"
+          }[5m]) > 0.05
+        for: 5m
+        labels:
+          severity: critical
+          service: "{{ $labels.destination_service_name }}"
+        annotations:
+          summary: "High error rate detected in {{ $labels.destination_service_name }}"
+          description: |
+            Service {{ $labels.destination_service_name }} has error rate of 
+            {{ $value | humanizePercentage }} over the last 5 minutes.
+            This may indicate a problem that requires investigation.
+
+      # ==================== HIGH LATENCY ====================
+      - alert: HighLatency
+        expr: |
+          histogram_quantile(0.99,
+            rate(istio_request_duration_milliseconds_bucket{
+              destination_service_namespace="techstore"
+            }[5m])
+          ) > 2000
+        for: 5m
+        labels:
+          severity: warning
+          service: "{{ $labels.destination_service_name }}"
+        annotations:
+          summary: "High latency detected in {{ $labels.destination_service_name }}"
+          description: |
+            Service {{ $labels.destination_service_name }} has P99 latency of 
+            {{ $value }}ms over the last 5 minutes.
+
+      # ==================== CIRCUIT BREAKER OPEN ====================
+      - alert: CircuitBreakerOpen
+        expr: |
+          increase(
+            {__name__=~".*_circuit_breaker_state.*"} == 1
+          [5m]) > 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Circuit breaker is OPEN for a service"
+          description: |
+            Circuit breaker is OPEN, indicating repeated failures.
+            Service may be experiencing issues.
+
+      # ==================== POD CRASH LOOPING ====================
+      - alert: PodCrashLooping
+        expr: |
+          rate(kube_pod_container_status_restarts_total{
+            namespace="techstore"
+          }[15m]) > 0
+        for: 5m
+        labels:
+          severity: critical
+          namespace: techstore
+        annotations:
+          summary: "Pod is crash looping in {{ $labels.namespace }}"
+          description: |
+            Pod {{ $labels.pod }} in namespace {{ $labels.namespace }} 
+            is restarting repeatedly.
+
+      # ==================== HIGH CPU USAGE ====================
+      - alert: HighCPUUsage
+        expr: |
+          (
+            sum(rate(container_cpu_usage_seconds_total{
+              namespace="techstore",
+              pod=~".*"
+            }[5m])) by (pod, namespace)
+            /
+            sum(kube_pod_container_resource_requests{
+              namespace="techstore",
+              resource="cpu"
+            }) by (pod, namespace)
+          ) > 0.9
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High CPU usage detected"
+          description: |
+            Pod {{ $labels.pod }} is using {{ $value | humanizePercentage }} CPU.
+            Consider scaling up.
+
+      # ==================== HIGH MEMORY USAGE ====================
+      - alert: HighMemoryUsage
+        expr: |
+          (
+            sum(container_memory_working_set_bytes{
+              namespace="techstore",
+              pod=~".*"
+            }) by (pod, namespace)
+            /
+            sum(kube_pod_container_resource_limits{
+              namespace="techstore",
+              resource="memory"
+            }) by (pod, namespace)
+          ) > 0.9
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High memory usage detected"
+          description: |
+            Pod {{ $labels.pod }} is using {{ $value | humanizePercentage }} memory.
+            Consider scaling up or optimizing memory usage.
+
+      # ==================== POD NOT READY ====================
+      - alert: PodNotReady
+        expr: |
+          sum by (namespace, pod) (
+            kube_pod_status_phase{
+              phase!~"Running|Succeeded",
+              namespace="techstore"
+            }
+          ) > 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Pod is not ready in {{ $labels.namespace }}"
+          description: |
+            Pod {{ $labels.pod }} has been in {{ $labels.phase }} state 
+            for more than 5 minutes.
+
+      # ==================== HPA SCALING ISSUES ====================
+      - alert: HPAUnableToScale
+        expr: |
+          kube_horizontalpodautoscaler_status_condition{
+            condition="AbleToScale",
+            status="false",
+            namespace="techstore"
+          } == 1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "HPA unable to scale {{ $labels.horizontalpodautoscaler }}"
+          description: |
+            HorizontalPodAutoscaler {{ $labels.horizontalpodautoscaler }} 
+            is unable to scale. Check resource limits and constraints.
+
+      # ==================== SERVICE AVAILABILITY ====================
+      - alert: ServiceUnavailable
+        expr: |
+          up{
+            job="kubernetes-pods",
+            namespace="techstore"
+          } == 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Service {{ $labels.service }} is unavailable"
+          description: |
+            Service {{ $labels.service }} has been unavailable for 
+            more than 5 minutes.
+
+      # ==================== DATABASE CONNECTION ISSUES ====================
+      - alert: DatabaseConnectionIssues
+        expr: |
+          rate(
+            {__name__=~".*_database_connection_errors.*"} 
+            [5m]
+          ) > 0.1
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Database connection issues detected"
+          description: |
+            High rate of database connection errors detected.
+            Service may be unable to connect to database.
+
+      # ==================== ISTIO SIDECAR ISSUES ====================
+      - alert: IstioSidecarDown
+        expr: |
+          istio_agent_health_status{
+            namespace="techstore"
+          } == 0
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Istio sidecar is down for pod {{ $labels.pod }}"
+          description: |
+            Istio sidecar proxy is not healthy for pod {{ $labels.pod }}.
+            Service mesh features may not work correctly.
+
+---
+# Alertmanager Configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: alertmanager-config
+  namespace: monitoring
+data:
+  alertmanager.yml: |
+    global:
+      resolve_timeout: 5m
+      # Slack webhook (konfiguro sipas nevojës)
+      # slack_api_url: 'YOUR_SLACK_WEBHOOK_URL'
+      
+    route:
+      group_by: ['alertname', 'service', 'severity']
+      group_wait: 10s
+      group_interval: 10s
+      repeat_interval: 12h
+      receiver: 'default'
+      routes:
+        - match:
+            severity: critical
+          receiver: 'critical-alerts'
+          continue: true
+        - match:
+            severity: warning
+          receiver: 'warning-alerts'
+          
+    receivers:
+      - name: 'default'
+        webhook_configs:
+          - url: 'http://notification-service.techstore.svc.cluster.local:3005/api/notifications/alert'
+            send_resolved: true
+            
+      - name: 'critical-alerts'
+        webhook_configs:
+          - url: 'http://notification-service.techstore.svc.cluster.local:3005/api/notifications/alert'
+            send_resolved: true
+        # Email (konfiguro sipas nevojës)
+        # email_configs:
+        #   - to: 'devops@techstore.com'
+        #     from: 'alerts@techstore.com'
+        #     smarthost: 'smtp.gmail.com:587'
+        #     auth_username: 'your-email@gmail.com'
+        #     auth_password: 'your-password'
+            
+      - name: 'warning-alerts'
+        webhook_configs:
+          - url: 'http://notification-service.techstore.svc.cluster.local:3005/api/notifications/alert'
+            send_resolved: true

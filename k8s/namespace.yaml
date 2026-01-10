@@ -1,0 +1,8 @@
+# Namespace për TechStore me Istio sidecar injection
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: techstore
+  labels:
+    name: techstore
+    istio-injection: enabled  # Aktivizo automatic sidecar injection

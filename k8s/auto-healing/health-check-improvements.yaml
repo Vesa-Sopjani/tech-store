@@ -1,0 +1,87 @@
+# Health Check Improvements - Probes të përmirësuara për auto-healing
+# Këto probesh i shtohen deployments ekzistues
+
+# Template për liveness probe (kontrollon nëse aplikacioni është i gjallë)
+# Nëse dështon, Kubernetes restart pod
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: health-check-config
+  namespace: techstore
+data:
+  liveness_probe.yaml: |
+    livenessProbe:
+      httpGet:
+        path: /health
+        port: http
+        scheme: HTTP
+      initialDelaySeconds: 30    # Prit 30s para se të fillojë kontrollin
+      periodSeconds: 10           # Kontrollo çdo 10 sekonda
+      timeoutSeconds: 5           # Timeout 5 sekonda
+      successThreshold: 1         # 1 sukses = i gjallë
+      failureThreshold: 3         # 3 dështime = restart pod
+      
+  readiness_probe.yaml: |
+    readinessProbe:
+      httpGet:
+        path: /health
+        port: http
+        scheme: HTTP
+      initialDelaySeconds: 10    # Prit 10s para se të kontrollojë
+      periodSeconds: 5            # Kontrollo çdo 5 sekonda
+      timeoutSeconds: 3           # Timeout 3 sekonda
+      successThreshold: 1         # 1 sukses = ready
+      failureThreshold: 3         # 3 dështime = remove nga service endpoints
+      
+  startup_probe.yaml: |
+    startupProbe:
+      httpGet:
+        path: /health
+        port: http
+        scheme: HTTP
+      initialDelaySeconds: 0      # Filloj menjëherë
+      periodSeconds: 5            # Kontrollo çdo 5 sekonda
+      timeoutSeconds: 3
+      successThreshold: 1         # 1 sukses = startup i suksesshëm
+      failureThreshold: 30        # 30 dështime (150s total) para se të dështojë
+      
+  health_endpoint_example.js: |
+    // Shto në app.js për health check të plotë
+    app.get('/health', async (req, res) => {
+      const health = {
+        status: 'healthy',
+        timestamp: new Date().toISOString(),
+        uptime: process.uptime(),
+        checks: {
+          database: 'unknown',
+          redis: 'unknown',
+          memory: 'unknown'
+        }
+      };
+      
+      // Kontrollo database
+      try {
+        const connection = await pool.getConnection();
+        await connection.ping();
+        connection.release();
+        health.checks.database = 'healthy';
+      } catch (error) {
+        health.checks.database = 'unhealthy';
+        health.status = 'unhealthy';
+      }
+      
+      // Kontrollo memory
+      const memUsage = process.memoryUsage();
+      const memPercent = (memUsage.heapUsed / memUsage.heapTotal) * 100;
+      health.checks.memory = {
+        used: `${Math.round(memPercent)}%`,
+        status: memPercent > 90 ? 'warning' : 'healthy'
+      };
+      
+      if (memPercent > 95) {
+        health.status = 'unhealthy';
+      }
+      
+      const statusCode = health.status === 'healthy' ? 200 : 503;
+      res.status(statusCode).json(health);
+    });

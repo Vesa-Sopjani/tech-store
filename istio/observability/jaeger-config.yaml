@@ -1,0 +1,57 @@
+# Jaeger Configuration për distributed tracing
+apiVersion: jaegertracing.io/v1
+kind: Jaeger
+metadata:
+  name: jaeger
+  namespace: istio-system
+spec:
+  strategy: production
+  storage:
+    type: memory
+    options:
+      memory:
+        max-traces: 50000
+  agent:
+    strategy: DaemonSet
+  collector:
+    replicas: 2
+    resources:
+      limits:
+        cpu: 500m
+        memory: 1Gi
+      requests:
+        cpu: 100m
+        memory: 500Mi
+  query:
+    replicas: 1
+    resources:
+      limits:
+        cpu: 500m
+        memory: 1Gi
+      requests:
+        cpu: 100m
+        memory: 500Mi
+  ingress:
+    enabled: true
+    annotations:
+      kubernetes.io/ingress.class: istio
+    hosts:
+      - jaeger.techstore.local
+
+---
+# Jaeger ServiceMonitor për Prometheus
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: jaeger
+  namespace: istio-system
+  labels:
+    app: jaeger
+spec:
+  selector:
+    matchLabels:
+      app: jaeger-query
+  endpoints:
+    - port: http-query
+      interval: 30s
+      path: /metrics

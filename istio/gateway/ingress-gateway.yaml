@@ -1,0 +1,49 @@
+# Gateway për trafikun nga jashtë (ingress)
+apiVersion: networking.istio.io/v1beta1
+kind: Gateway
+metadata:
+  name: techstore-gateway
+  namespace: techstore
+spec:
+  selector:
+    istio: ingressgateway
+  servers:
+    - port:
+        number: 80
+        name: http
+        protocol: HTTP
+      hosts:
+        - techstore.local
+        - api.techstore.local
+      # Redirect HTTP në HTTPS (opsionale)
+      # tls:
+      #   httpsRedirect: true
+    - port:
+        number: 443
+        name: https
+        protocol: HTTPS
+      hosts:
+        - techstore.local
+        - api.techstore.local
+      tls:
+        mode: SIMPLE
+        credentialName: techstore-tls-cert
+        # Nëse nuk ke certifikatë SSL, përdor mode: MUTUAL ose SIMPLE me self-signed cert
+
+---
+# Gateway për trafikun internal (mesh-internal)
+apiVersion: networking.istio.io/v1beta1
+kind: Gateway
+metadata:
+  name: mesh-internal-gateway
+  namespace: techstore
+spec:
+  selector:
+    istio: ingressgateway
+  servers:
+    - port:
+        number: 15021
+        name: status-port
+        protocol: HTTP
+      hosts:
+        - "*"

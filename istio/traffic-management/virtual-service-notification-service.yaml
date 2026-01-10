@@ -1,0 +1,20 @@
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: notification-service-vs
+  namespace: techstore
+spec:
+  hosts:
+    - notification-service
+    - notification-service.techstore.svc.cluster.local
+  http:
+    - route:
+        - destination:
+            host: notification-service
+            subset: v1
+          weight: 100
+      timeout: 30s
+      retries:
+        attempts: 3
+        perTryTimeout: 10s
+        retryOn: 5xx,connect-failure

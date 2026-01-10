@@ -1,0 +1,56 @@
+# Telemetry configuration për tracing dhe metrics
+apiVersion: telemetry.istio.io/v1alpha1
+kind: Telemetry
+metadata:
+  name: mesh-default
+  namespace: istio-system
+spec:
+  accessLogging:
+    - providers:
+        - name: envoy
+  tracing:
+    - providers:
+        - name: jaeger
+    randomSamplingPercentage: 100.0 # Në production, përdor 1-5%
+  metrics:
+    - providers:
+        - name: prometheus
+
+---
+# Telemetry për namespace techstore
+apiVersion: telemetry.istio.io/v1alpha1
+kind: Telemetry
+metadata:
+  name: techstore-telemetry
+  namespace: techstore
+spec:
+  accessLogging:
+    - providers:
+        - name: envoy
+      match:
+        - mode: CLIENT_AND_SERVER
+  tracing:
+    - providers:
+        - name: jaeger
+    randomSamplingPercentage: 100.0
+  metrics:
+    - providers:
+        - name: prometheus
+      overrides:
+        - match:
+            metric: REQUEST_COUNT
+          mode: CLIENT_AND_SERVER
+          tagOverrides:
+            request_method:
+              value: REQUEST_METHOD
+            request_path:
+              value: REQUEST_PATH
+        - match:
+            metric: REQUEST_DURATION
+          mode: CLIENT_AND_SERVER
+        - match:
+            metric: REQUEST_SIZE
+          mode: CLIENT_AND_SERVER
+        - match:
+            metric: RESPONSE_SIZE
+          mode: CLIENT_AND_SERVER

@@ -1,0 +1,30 @@
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: admin-service-dr
+  namespace: techstore
+spec:
+  host: admin-service
+  trafficPolicy:
+    loadBalancer:
+      simple: ROUND_ROBIN
+    connectionPool:
+      tcp:
+        maxConnections: 50
+        connectTimeout: 30s
+      http:
+        http1MaxPendingRequests: 10
+        http2MaxRequests: 50
+        maxRequestsPerConnection: 2
+    outlierDetection:
+      consecutiveErrors: 2
+      interval: 30s
+      baseEjectionTime: 30s
+      maxEjectionPercent: 50
+    tls:
+      mode: ISTIO_MUTUAL
+      sni: admin-service.techstore.svc.cluster.local
+  subsets:
+    - name: v1
+      labels:
+        version: v1

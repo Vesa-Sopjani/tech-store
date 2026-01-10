@@ -1,0 +1,99 @@
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: api-gateway-vs
+  namespace: techstore
+spec:
+  hosts:
+    - api-gateway
+    - api-gateway.techstore.svc.cluster.local
+  http:
+    - match:
+        - uri:
+            prefix: "/api/products"
+      route:
+        - destination:
+            host: product-service
+            port:
+              number: 5001
+          weight: 100
+      timeout: 30s
+      retries:
+        attempts: 3
+        perTryTimeout: 10s
+        retryOn: 5xx,connect-failure,refused-stream
+    - match:
+        - uri:
+            prefix: "/api/users"
+      route:
+        - destination:
+            host: user-service
+            port:
+              number: 5003
+          weight: 100
+      timeout: 30s
+      retries:
+        attempts: 3
+        perTryTimeout: 10s
+    - match:
+        - uri:
+            prefix: "/api/orders"
+      route:
+        - destination:
+            host: order-service
+            port:
+              number: 5004
+          weight: 100
+      timeout: 60s
+      retries:
+        attempts: 3
+        perTryTimeout: 15s
+    - match:
+        - uri:
+            prefix: "/api/categories"
+      route:
+        - destination:
+            host: category-service
+            port:
+              number: 5005
+          weight: 100
+      timeout: 30s
+      retries:
+        attempts: 3
+        perTryTimeout: 10s
+    - match:
+        - uri:
+            prefix: "/api/analytics"
+      route:
+        - destination:
+            host: analytics-service
+            port:
+              number: 3004
+          weight: 100
+      timeout: 45s
+    - match:
+        - uri:
+            prefix: "/api/notifications"
+      route:
+        - destination:
+            host: notification-service
+            port:
+              number: 3005
+          weight: 100
+      timeout: 30s
+    - match:
+        - uri:
+            prefix: "/api/admin"
+      route:
+        - destination:
+            host: admin-service
+            port:
+              number: 5004
+          weight: 100
+      timeout: 30s
+    - route:
+        - destination:
+            host: api-gateway
+            port:
+              number: 8080
+          weight: 100

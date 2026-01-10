@@ -1,0 +1,75 @@
+# Kiali Service dhe Deployment
+apiVersion: v1
+kind: Service
+metadata:
+  name: kiali
+  namespace: istio-system
+  labels:
+    app: kiali
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 20001
+      targetPort: 20001
+      protocol: TCP
+  selector:
+    app: kiali
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: kiali-grafana
+  namespace: istio-system
+  labels:
+    app: grafana
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 3000
+      targetPort: 3000
+      protocol: TCP
+  selector:
+    app: grafana
+
+---
+# Kiali Ingress
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: kiali-vs
+  namespace: istio-system
+spec:
+  hosts:
+    - kiali.techstore.local
+    - kiali.istio-system.svc.cluster.local
+  gateways:
+    - istio-system/kiali-gateway
+  http:
+    - match:
+        - uri:
+            prefix: "/"
+      route:
+        - destination:
+            host: kiali
+            port:
+              number: 20001
+
+---
+apiVersion: networking.istio.io/v1beta1
+kind: Gateway
+metadata:
+  name: kiali-gateway
+  namespace: istio-system
+spec:
+  selector:
+    istio: ingressgateway
+  servers:
+    - port:
+        number: 80
+        name: http-kiali
+        protocol: HTTP
+      hosts:
+        - kiali.techstore.local

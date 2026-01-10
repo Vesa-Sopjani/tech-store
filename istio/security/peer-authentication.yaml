@@ -1,0 +1,63 @@
+# PeerAuthentication për mTLS midis të gjitha shërbimeve
+apiVersion: security.istio.io/v1beta1
+kind: PeerAuthentication
+metadata:
+  name: default
+  namespace: techstore
+spec:
+  mtls:
+    mode: STRICT
+  selector:
+    matchLabels:
+      istio: ingressgateway
+
+---
+# PeerAuthentication për namespace techstore
+apiVersion: security.istio.io/v1beta1
+kind: PeerAuthentication
+metadata:
+  name: default
+  namespace: techstore
+spec:
+  mtls:
+    mode: STRICT
+
+---
+# PeerAuthentication për database dhe infrastrukturë (PERMISSIVE për migrim të qetë)
+apiVersion: security.istio.io/v1beta1
+kind: PeerAuthentication
+metadata:
+  name: mysql-permissive
+  namespace: techstore
+spec:
+  selector:
+    matchLabels:
+      app: mysql
+  mtls:
+    mode: PERMISSIVE
+
+---
+apiVersion: security.istio.io/v1beta1
+kind: PeerAuthentication
+metadata:
+  name: redis-permissive
+  namespace: techstore
+spec:
+  selector:
+    matchLabels:
+      app: redis
+  mtls:
+    mode: PERMISSIVE
+
+---
+apiVersion: security.istio.io/v1beta1
+kind: PeerAuthentication
+metadata:
+  name: kafka-permissive
+  namespace: techstore
+spec:
+  selector:
+    matchLabels:
+      app: kafka
+  mtls:
+    mode: PERMISSIVE

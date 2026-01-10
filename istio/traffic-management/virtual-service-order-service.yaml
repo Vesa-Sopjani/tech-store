@@ -1,0 +1,43 @@
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: order-service-vs
+  namespace: techstore
+spec:
+  hosts:
+    - order-service
+    - order-service.techstore.svc.cluster.local
+  http:
+    - route:
+        - destination:
+            host: order-service
+            subset: v1
+          weight: 90
+        - destination:
+            host: order-service
+            subset: v2
+          weight: 10
+      timeout: 60s
+      retries:
+        attempts: 3
+        perTryTimeout: 15s
+        retryOn: 5xx,connect-failure,refused-stream,retriable-4xx
+    - match:
+        - headers:
+            x-canary:
+              exact: "true"
+      route:
+        - destination:
+            host: order-service
+            subset: v2
+          weight: 100
+      timeout: 60s
+    - match:
+        - method:
+            exact: POST
+          uri:
+            prefix: "/api/orders"
+      timeout: 90s
+      retries:
+        attempts: 2
+        perTryTimeout: 30s

@@ -1,0 +1,46 @@
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: user-service-vs
+  namespace: techstore
+spec:
+  hosts:
+    - user-service
+    - user-service.techstore.svc.cluster.local
+  http:
+    - route:
+        - destination:
+            host: user-service
+            subset: v1
+          weight: 100
+      timeout: 30s
+      retries:
+        attempts: 3
+        perTryTimeout: 10s
+        retryOn: 5xx,connect-failure,refused-stream
+    - match:
+        - headers:
+            x-user-type:
+              regex: "premium|admin"
+      route:
+        - destination:
+            host: user-service
+            subset: v1
+      timeout: 60s
+      fault:
+        abort:
+          percentage:
+            value: 0
+    - match:
+        - queryParams:
+            slow:
+              exact: "true"
+      fault:
+        delay:
+          percentage:
+            value: 100
+          fixedDelay: 7s
+      route:
+        - destination:
+            host: user-service
+            subset: v1

@@ -1,0 +1,31 @@
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: admin-service-vs
+  namespace: techstore
+spec:
+  hosts:
+    - admin-service
+    - admin-service.techstore.svc.cluster.local
+  http:
+    - match:
+        - headers:
+            x-admin-auth:
+              exact: "true"
+      route:
+        - destination:
+            host: admin-service
+            subset: v1
+          weight: 100
+      timeout: 30s
+    - route:
+        - destination:
+            host: admin-service
+            subset: v1
+          weight: 100
+      timeout: 30s
+      fault:
+        abort:
+          httpStatus: 403
+          percentage:
+            value: 0

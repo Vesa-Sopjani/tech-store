@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react'; // Shto useEffect
 import { BrowserRouter as Router, Routes, Route, Link, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { ToastContainer, toast } from 'react-toastify';
@@ -41,7 +41,8 @@ import {
   FiBell,
   FiSettings,
   FiHelpCircle,
-  FiGrid
+  FiGrid,
+  FiRefreshCw
 } from 'react-icons/fi';
 
 import {
@@ -57,8 +58,8 @@ import {
   FaCcAmex
 } from 'react-icons/fa';
 
-// API configuration
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+// API configuration - ndrysho portin në 5001 (siç është në backend)
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5001';
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -67,106 +68,6 @@ const api = axios.create({
     'Content-Type': 'application/json',
   }
 });
-
-// Mock data for demonstration
-const mockProducts = [
-  {
-    id: '1',
-    name: 'Apple iPhone 15 Pro',
-    description: 'Titanium design, A17 Pro chip, 48MP camera system',
-    price: 999.99,
-    category: 'Smartphones',
-    rating: 4.8,
-    reviews: 1250,
-    image: 'https://images.unsplash.com/photo-1695048133142-1a20484d2569?w=400&h=400&fit=crop',
-    stock: 50,
-    features: ['5G', 'Face ID', 'Pro Camera', 'iOS 17']
-  },
-  {
-    id: '2',
-    name: 'Samsung Galaxy S24 Ultra',
-    description: 'AI-powered smartphone with 200MP camera',
-    price: 1199.99,
-    category: 'Smartphones',
-    rating: 4.7,
-    reviews: 980,
-    image: 'https://images.unsplash.com/photo-1610945265064-0e34e5519bbf?w=400&h=400&fit=crop',
-    stock: 35,
-    features: ['AI Features', 'S Pen', 'Nightography', 'Android 14']
-  },
-  {
-    id: '3',
-    name: 'MacBook Pro 16" M3 Max',
-    description: 'Supercharged by M3 Max chip for extreme performance',
-    price: 3499.99,
-    category: 'Laptops',
-    rating: 4.9,
-    reviews: 620,
-    image: 'https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w-400&h=400&fit=crop',
-    stock: 20,
-    features: ['M3 Max Chip', '40-core GPU', '96GB RAM', 'Liquid Retina XDR']
-  },
-  {
-    id: '4',
-    name: 'Sony WH-1000XM5',
-    description: 'Industry-leading noise cancellation headphones',
-    price: 399.99,
-    category: 'Audio',
-    rating: 4.8,
-    reviews: 2100,
-    image: 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=400&h=400&fit=crop',
-    stock: 100,
-    features: ['Noise Cancelling', '30hr Battery', 'Hi-Res Audio', 'Touch Controls']
-  },
-  {
-    id: '5',
-    name: 'DJI Mavic 3 Pro',
-    description: 'Tri-camera drone with 4/3 CMOS Hasselblad camera',
-    price: 2199.99,
-    category: 'Drones',
-    rating: 4.9,
-    reviews: 450,
-    image: 'https://images.unsplash.com/photo-1473968512647-3e447244af8f?w=400&h=400&fit=crop',
-    stock: 15,
-    features: ['4K/120fps', '46min Flight', '15km Range', 'Omnidirectional Sensing']
-  },
-  {
-    id: '6',
-    name: 'PlayStation 5 Pro',
-    description: 'Next-gen gaming console with 8K support',
-    price: 699.99,
-    category: 'Gaming',
-    rating: 4.7,
-    reviews: 3200,
-    image: 'https://images.unsplash.com/photo-1606144042614-b2417e99c4e3?w=400&h=400&fit=crop',
-    stock: 25,
-    features: ['8K Gaming', '120fps', 'Ray Tracing', '825GB SSD']
-  },
-  {
-    id: '7',
-    name: 'Apple Watch Series 9',
-    description: 'Smartwatch with advanced health monitoring',
-    price: 429.99,
-    category: 'Wearables',
-    rating: 4.6,
-    reviews: 1800,
-    image: 'https://images.unsplash.com/photo-1434493650001-5d43a6fea0c0?w=400&h=400&fit=crop',
-    stock: 75,
-    features: ['ECG App', 'Blood Oxygen', 'GPS', 'Always-On Retina']
-  },
-  {
-    id: '8',
-    name: 'Samsung 55" OLED TV',
-    description: '4K OLED Smart TV with Quantum Processor',
-    price: 1499.99,
-    category: 'TV & Home',
-    rating: 4.8,
-    reviews: 890,
-    image: 'https://images.unsplash.com/photo-1593359677879-a4bb92f829d1?w=400&h=400&fit=crop',
-    stock: 30,
-    features: ['OLED 4K', 'HDR10+', 'Smart TV', 'Game Mode']
-  }
-];
 
 const categories = [
   { name: 'Smartphones', icon: '📱', count: 45 },
@@ -181,16 +82,88 @@ const categories = [
 
 // Main App Component
 function App() {
-  const [products, setProducts] = useState(mockProducts);
+  const [products, setProducts] = useState([]); // Fillimisht bosh
   const [cart, setCart] = useState([]);
   const [wishlist, setWishlist] = useState([]);
   const [orders, setOrders] = useState([]);
   const [user, setUser] = useState(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true); // Shto loading state
+  const [error, setError] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [refreshTrigger, setRefreshTrigger] = useState(0); // Për refresh
+
+  // Funksion për të marrë produktet nga API
+  const fetchProducts = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      const response = await api.get('/api/products');
+      console.log('📦 API Response:', response.data);
+      
+      if (response.data.success) {
+        // Transformo të dhënat nga API në formatin që pranon frontend-i
+        const transformedProducts = response.data.data.map(product => ({
+          id: product.id.toString(),
+          name: product.name,
+          description: product.description,
+          price: parseFloat(product.price) || 0,
+          category: product.category_name || 'Uncategorized',
+          rating: 4.5, // Default rating
+          reviews: Math.floor(Math.random() * 1000), // Random për demo
+          image: product.image_url || 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=400&h=400&fit=crop',
+          stock: product.stock_quantity || 0,
+          features: product.specifications && typeof product.specifications === 'object'
+            ? Object.entries(product.specifications).slice(0, 3).map(([key, value]) => `${key}: ${value}`)
+            : ['High Quality', 'Premium Material', 'Latest Technology']
+        }));
+        
+        console.log(`✅ U morën ${transformedProducts.length} produkte`);
+        setProducts(transformedProducts);
+      } else {
+        throw new Error('API nuk u përgjigj me sukses');
+      }
+    } catch (err) {
+      console.error('❌ Error fetching products:', err);
+      setError('Nuk mund të ngarkohen produktet. Ju lutem kontrolloni serverin.');
+      toast.error('Failed to load products from server');
+      
+      // Fallback: përdor mock data nëse API dështon
+      const mockProducts = [
+        {
+          id: '1',
+          name: 'Apple iPhone 15 Pro',
+          description: 'Titanium design, A17 Pro chip, 48MP camera system',
+          price: 999.99,
+          category: 'Smartphones',
+          rating: 4.8,
+          reviews: 1250,
+          image: 'https://images.unsplash.com/photo-1695048133142-1a20484d2569?w=400&h=400&fit=crop',
+          stock: 50,
+          features: ['5G', 'Face ID', 'Pro Camera', 'iOS 17']
+        }
+      ];
+      setProducts(mockProducts);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Fetch produktet kur komponenti mount dhe kur refreshTrigger ndryshon
+  useEffect(() => {
+    fetchProducts();
+    
+    // Refresh automatik çdo 60 sekonda
+    const interval = setInterval(() => {
+      fetchProducts();
+      console.log('🔄 Auto-refreshing products...');
+    }, 60000);
+    
+    return () => clearInterval(interval);
+  }, [refreshTrigger]);
 
   // Calculate cart total
   const cartTotal = cart.reduce((total, item) => total + (item.price * item.quantity), 0);
@@ -273,16 +246,22 @@ function App() {
     }
   };
 
+  // Refresh products manually
+  const refreshProducts = () => {
+    setRefreshTrigger(prev => prev + 1);
+    toast.info('Refreshing products...');
+  };
+
   const TestAuth = () => {
-  const auth = useAuth();
-  console.log('🧪 AuthContext test:', {
-    isAuthenticated: auth.isAuthenticated,
-    type: typeof auth.isAuthenticated,
-    user: auth.user,
-    loading: auth.loading
-  });
-  return null;
-};
+    const auth = useAuth();
+    console.log('🧪 AuthContext test:', {
+      isAuthenticated: auth.isAuthenticated,
+      type: typeof auth.isAuthenticated,
+      user: auth.user,
+      loading: auth.loading
+    });
+    return null;
+  };
 
   return (
     <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
@@ -299,6 +278,7 @@ function App() {
           <Header 
             cartItemCount={cartItemCount} 
             wishlistCount={wishlist.length}
+            onRefreshProducts={refreshProducts}
           />
 
           {/* Main Content */}
@@ -313,6 +293,8 @@ function App() {
                   addToCart={addToCart}
                   toggleWishlist={toggleWishlist}
                   setSelectedCategory={setSelectedCategory}
+                  loading={loading}
+                  error={error}
                 />
               } />
 
@@ -328,6 +310,9 @@ function App() {
                   wishlist={wishlist}
                   searchQuery={searchQuery}
                   setSearchQuery={setSearchQuery}
+                  loading={loading}
+                  error={error}
+                  onRefresh={refreshProducts}
                 />
               } />
 
@@ -342,6 +327,7 @@ function App() {
                   addToCart={addToCart}
                   toggleWishlist={toggleWishlist}
                   wishlist={wishlist}
+                  loading={loading}
                 />
               } />
 
@@ -357,17 +343,16 @@ function App() {
               {/* Profile Page */}
               <Route path="/profile" element={
                 <ProtectedRoute>
-               <Profile/>
+                  <Profile/>
                 </ProtectedRoute>
               } />
 
-               {/* Contact Page */}
+              {/* Contact Page */}
               <Route path="/contactus" element={
                 <ProtectedRoute>
-               <ContactUs/>
+                  <ContactUs/>
                 </ProtectedRoute>
               } />
-
 
               {/* Orders Page */}
               <Route path="/orders" element={
@@ -382,11 +367,11 @@ function App() {
               } />
 
               {/* Admin Dashboard */}
-<Route path="/admin/dashboard" element={
-  <ProtectedRoute allowedRoles={['admin', 'administrator']}>
-    <AdminDashboard /> 
-  </ProtectedRoute>
-} />
+              <Route path="/admin/dashboard" element={
+                <ProtectedRoute allowedRoles={['admin', 'administrator']}>
+                  <AdminDashboard onProductAdded={refreshProducts} /> 
+                </ProtectedRoute>
+              } />
 
               {/* Cart Page */}
               <Route path="/cart" element={
@@ -404,13 +389,12 @@ function App() {
 
               <Route path="/register" element={<Register />} />
               <Route path="/login" element={<Login />} />
-              <Route path="/logout" element={<Logout />} /> {/* Shto këtë linjë */}
+              <Route path="/logout" element={<Logout />} />
               <Route path="/profile" element={
-  <ProtectedRoute>
-    <Profile />
-  </ProtectedRoute>
-} />
-
+                <ProtectedRoute>
+                  <Profile />
+                </ProtectedRoute>
+              } />
             </Routes>
           </div>
 
@@ -461,7 +445,6 @@ function App() {
                   <ul className="space-y-3">
                     <li><Link to="#" className="text-gray-400 hover:text-white">Help Center</Link></li>
                     <li><Link to="/contactus" className="text-gray-400 hover:text-white">Contact Us</Link></li>
-                   
                   </ul>
                 </div>
 
@@ -513,7 +496,7 @@ function App() {
 }
 
 // Home Page Component
-function HomePage({ categories, products, wishlist, addToCart, toggleWishlist, setSelectedCategory }) {
+function HomePage({ categories, products, wishlist, addToCart, toggleWishlist, setSelectedCategory, loading, error }) {
   const navigate = useNavigate();
 
   return (
@@ -533,7 +516,6 @@ function HomePage({ categories, products, wishlist, addToCart, toggleWishlist, s
                 <Link to="/products" className="px-8 py-4 bg-white text-blue-900 rounded-full font-semibold hover:shadow-2xl transition-shadow">
                   Shop Now
                 </Link>
-               
               </div>
             </div>
             <div className="relative">
@@ -583,17 +565,49 @@ function HomePage({ categories, products, wishlist, addToCart, toggleWishlist, s
             View All <FiChevronRight className="ml-1" />
           </Link>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-          {products.slice(0, 4).map(product => (
-            <ProductCard
-              key={product.id}
-              product={product}
-              addToCart={addToCart}
-              toggleWishlist={toggleWishlist}
-              isInWishlist={wishlist.some(item => item.id === product.id)}
-            />
-          ))}
-        </div>
+        
+        {loading ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+            {[...Array(4)].map((_, i) => (
+              <div key={i} className="bg-white rounded-2xl shadow-lg p-6 animate-pulse">
+                <div className="h-48 bg-gray-200 rounded-xl mb-4"></div>
+                <div className="h-4 bg-gray-200 rounded mb-2"></div>
+                <div className="h-4 bg-gray-200 rounded mb-4"></div>
+                <div className="h-10 bg-gray-200 rounded"></div>
+              </div>
+            ))}
+          </div>
+        ) : error ? (
+          <div className="text-center py-12">
+            <div className="text-red-500 text-4xl mb-4">⚠️</div>
+            <h3 className="text-xl font-bold text-gray-900 mb-2">Error loading products</h3>
+            <p className="text-gray-600 mb-4">{error}</p>
+            <button 
+              onClick={() => window.location.reload()}
+              className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+            >
+              Try Again
+            </button>
+          </div>
+        ) : products.length === 0 ? (
+          <div className="text-center py-12">
+            <div className="text-gray-400 text-4xl mb-4">📦</div>
+            <h3 className="text-xl font-bold text-gray-900 mb-2">No products available</h3>
+            <p className="text-gray-600">Check back soon for new arrivals!</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+            {products.slice(0, 4).map(product => (
+              <ProductCard
+                key={product.id}
+                product={product}
+                addToCart={addToCart}
+                toggleWishlist={toggleWishlist}
+                isInWishlist={wishlist.some(item => item.id === product.id)}
+              />
+            ))}
+          </div>
+        )}
       </section>
 
       {/* Features Section */}
@@ -625,7 +639,20 @@ function HomePage({ categories, products, wishlist, addToCart, toggleWishlist, s
 }
 
 // Products Page Component
-function ProductsPage({ categories, selectedCategory, setSelectedCategory, filteredProducts, addToCart, toggleWishlist, wishlist, searchQuery, setSearchQuery }) {
+function ProductsPage({ 
+  categories, 
+  selectedCategory, 
+  setSelectedCategory, 
+  filteredProducts, 
+  addToCart, 
+  toggleWishlist, 
+  wishlist, 
+  searchQuery, 
+  setSearchQuery,
+  loading,
+  error,
+  onRefresh 
+}) {
   return (
     <div className="space-y-8">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
@@ -634,6 +661,14 @@ function ProductsPage({ categories, selectedCategory, setSelectedCategory, filte
           <p className="text-gray-600">Discover our premium collection</p>
         </div>
         <div className="flex items-center space-x-4">
+          <button
+            onClick={onRefresh}
+            className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center"
+            disabled={loading}
+          >
+            <FiRefreshCw className={`mr-2 ${loading ? 'animate-spin' : ''}`} />
+            {loading ? 'Refreshing...' : 'Refresh'}
+          </button>
           <select
             className="px-4 py-2 bg-white border rounded-lg"
             value={selectedCategory}
@@ -665,24 +700,58 @@ function ProductsPage({ categories, selectedCategory, setSelectedCategory, filte
         </div>
       </div>
 
-      {filteredProducts.length === 0 ? (
+      {loading ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
+          {[...Array(8)].map((_, i) => (
+            <div key={i} className="bg-white rounded-2xl shadow-lg p-6 animate-pulse">
+              <div className="h-48 bg-gray-200 rounded-xl mb-4"></div>
+              <div className="h-4 bg-gray-200 rounded mb-2"></div>
+              <div className="h-4 bg-gray-200 rounded mb-4"></div>
+              <div className="h-10 bg-gray-200 rounded"></div>
+            </div>
+          ))}
+        </div>
+      ) : error ? (
+        <div className="text-center py-16">
+          <div className="text-red-500 text-6xl mb-4">⚠️</div>
+          <h3 className="text-2xl font-bold text-gray-900 mb-2">Error loading products</h3>
+          <p className="text-gray-600 mb-8 max-w-md mx-auto">{error}</p>
+          <button 
+            onClick={onRefresh}
+            className="px-8 py-3 bg-blue-600 text-white rounded-full font-semibold hover:shadow-xl transition-shadow"
+          >
+            Try Again
+          </button>
+        </div>
+      ) : filteredProducts.length === 0 ? (
         <div className="text-center py-16">
           <div className="text-6xl mb-4">🔍</div>
           <h3 className="text-2xl font-bold text-gray-900 mb-2">No products found</h3>
           <p className="text-gray-600">Try adjusting your search or filter criteria</p>
+          <button 
+            onClick={() => setSearchQuery('')}
+            className="mt-4 px-6 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300"
+          >
+            Clear Search
+          </button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
-          {filteredProducts.map(product => (
-            <ProductCard
-              key={product.id}
-              product={product}
-              addToCart={addToCart}
-              toggleWishlist={toggleWishlist}
-              isInWishlist={wishlist.some(item => item.id === product.id)}
-            />
-          ))}
-        </div>
+        <>
+          <div className="text-gray-600">
+            Showing {filteredProducts.length} of {filteredProducts.length} products
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
+            {filteredProducts.map(product => (
+              <ProductCard
+                key={product.id}
+                product={product}
+                addToCart={addToCart}
+                toggleWishlist={toggleWishlist}
+                isInWishlist={wishlist.some(item => item.id === product.id)}
+              />
+            ))}
+          </div>
+        </>
       )}
     </div>
   );
@@ -915,9 +984,14 @@ function ProductCard({ product, addToCart, toggleWishlist, isInWishlist }) {
           >
             <FiHeart className={isInWishlist ? 'fill-current' : ''} />
           </button>
-          {product.stock < 10 && (
+          {product.stock < 10 && product.stock > 0 && (
             <div className="px-3 py-1 bg-red-500 text-white text-sm rounded-full">
               Only {product.stock} left
+            </div>
+          )}
+          {product.stock === 0 && (
+            <div className="px-3 py-1 bg-gray-500 text-white text-sm rounded-full">
+              Out of Stock
             </div>
           )}
         </div>
@@ -945,29 +1019,31 @@ function ProductCard({ product, addToCart, toggleWishlist, isInWishlist }) {
 
         <div className="flex items-center justify-between">
           <div>
-            <div className="text-2xl font-bold text-gray-900">${product.price}</div>
-            {product.originalPrice && (
-              <div className="text-sm text-gray-500 line-through">${product.originalPrice}</div>
-            )}
+            <div className="text-2xl font-bold text-gray-900">${product.price.toFixed(2)}</div>
           </div>
           <button
             onClick={() => addToCart(product)}
-            className="px-6 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-full hover:shadow-lg transition-shadow font-medium"
+            disabled={product.stock === 0}
+            className={`px-6 py-2 rounded-full font-medium transition-shadow ${product.stock === 0 
+              ? 'bg-gray-400 cursor-not-allowed' 
+              : 'bg-gradient-to-r from-blue-600 to-purple-600 text-white hover:shadow-lg'}`}
           >
-            Add to Cart
+            {product.stock === 0 ? 'Out of Stock' : 'Add to Cart'}
           </button>
         </div>
 
         {/* Features */}
-        <div className="mt-4 pt-4 border-t border-gray-100">
-          <div className="flex flex-wrap gap-2">
-            {product.features.slice(0, 2).map((feature, index) => (
-              <span key={index} className="px-2 py-1 bg-gray-100 text-gray-600 text-xs rounded">
-                {feature}
-              </span>
-            ))}
+        {product.features && product.features.length > 0 && (
+          <div className="mt-4 pt-4 border-t border-gray-100">
+            <div className="flex flex-wrap gap-2">
+              {product.features.slice(0, 2).map((feature, index) => (
+                <span key={index} className="px-2 py-1 bg-gray-100 text-gray-600 text-xs rounded">
+                  {feature}
+                </span>
+              ))}
+            </div>
           </div>
-        </div>
+        )}
       </div>
     </div>
   );

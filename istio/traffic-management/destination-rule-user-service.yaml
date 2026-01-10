@@ -1,0 +1,32 @@
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: user-service-dr
+  namespace: techstore
+spec:
+  host: user-service
+  trafficPolicy:
+    loadBalancer:
+      simple: LEAST_CONN
+    connectionPool:
+      tcp:
+        maxConnections: 150
+        connectTimeout: 30s
+      http:
+        http1MaxPendingRequests: 30
+        http2MaxRequests: 150
+        maxRequestsPerConnection: 2
+        h2UpgradePolicy: UPGRADE
+    outlierDetection:
+      consecutiveErrors: 3
+      interval: 30s
+      baseEjectionTime: 30s
+      maxEjectionPercent: 50
+      minHealthPercent: 50
+    tls:
+      mode: ISTIO_MUTUAL
+      sni: user-service.techstore.svc.cluster.local
+  subsets:
+    - name: v1
+      labels:
+        version: v1

@@ -1,0 +1,132 @@
+{
+  "dashboard": {
+    "title": "TechStore - Resilience & Auto-Healing Dashboard",
+    "tags": ["techstore", "resilience", "auto-healing"],
+    "timezone": "browser",
+    "panels": [
+      {
+        "id": 1,
+        "title": "Circuit Breaker Status",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "sum by (service) (increase({__name__=~\"*_circuit_breaker_state\"}[5m]))",
+            "legendFormat": "{{service}}"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0}
+      },
+      {
+        "id": 2,
+        "title": "Error Rate by Service",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(istio_requests_total{response_code=~\"5..\", destination_service_namespace=\"techstore\"}[5m])",
+            "legendFormat": "{{destination_service_name}}"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0}
+      },
+      {
+        "id": 3,
+        "title": "Request Latency (P50, P95, P99)",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.50, rate(istio_request_duration_milliseconds_bucket[5m]))",
+            "legendFormat": "P50"
+          },
+          {
+            "expr": "histogram_quantile(0.95, rate(istio_request_duration_milliseconds_bucket[5m]))",
+            "legendFormat": "P95"
+          },
+          {
+            "expr": "histogram_quantile(0.99, rate(istio_request_duration_milliseconds_bucket[5m]))",
+            "legendFormat": "P99"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 24, "x": 0, "y": 8}
+      },
+      {
+        "id": 4,
+        "title": "Pod Restarts",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(kube_pod_container_status_restarts_total{namespace=\"techstore\"}[15m])",
+            "legendFormat": "{{pod}}"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 16}
+      },
+      {
+        "id": 5,
+        "title": "HPA Replicas",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "kube_horizontalpodautoscaler_status_current_replicas{namespace=\"techstore\"}",
+            "legendFormat": "Current - {{horizontalpodautoscaler}}"
+          },
+          {
+            "expr": "kube_horizontalpodautoscaler_status_desired_replicas{namespace=\"techstore\"}",
+            "legendFormat": "Desired - {{horizontalpodautoscaler}}"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 16}
+      },
+      {
+        "id": 6,
+        "title": "Pod Status",
+        "type": "table",
+        "targets": [
+          {
+            "expr": "kube_pod_status_phase{namespace=\"techstore\"}",
+            "legendFormat": "{{pod}} - {{phase}}"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 24}
+      },
+      {
+        "id": 7,
+        "title": "Resource Usage (CPU)",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "sum(rate(container_cpu_usage_seconds_total{namespace=\"techstore\"}[5m])) by (pod)",
+            "legendFormat": "{{pod}}"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 24}
+      },
+      {
+        "id": 8,
+        "title": "Resource Usage (Memory)",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "sum(container_memory_working_set_bytes{namespace=\"techstore\"}) by (pod) / 1024 / 1024",
+            "legendFormat": "{{pod}} (MB)"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 32}
+      },
+      {
+        "id": 9,
+        "title": "Retry Rate",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(istio_requests_total{response_flags=~\".*retry.*\", destination_service_namespace=\"techstore\"}[5m])",
+            "legendFormat": "{{destination_service_name}}"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 32}
+      }
+    ],
+    "refresh": "30s",
+    "schemaVersion": 27,
+    "version": 1
+  }
+}

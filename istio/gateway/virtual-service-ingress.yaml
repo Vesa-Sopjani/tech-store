@@ -1,0 +1,89 @@
+# VirtualService për trafikun nga jashtë në API Gateway
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: techstore-ingress-vs
+  namespace: techstore
+spec:
+  hosts:
+    - techstore.local
+    - api.techstore.local
+    - "*" # Për development/testing
+  gateways:
+    - techstore-gateway
+    - mesh
+  http:
+    - match:
+        - uri:
+            prefix: "/api"
+      route:
+        - destination:
+            host: api-gateway
+            port:
+              number: 8080
+          weight: 100
+      timeout: 60s
+      retries:
+        attempts: 3
+        perTryTimeout: 10s
+        retryOn: 5xx,connect-failure,refused-stream
+      corsPolicy:
+        allowOrigins:
+          - exact: "*" # Në production, përdor domain specifike
+        allowMethods:
+          - GET
+          - POST
+          - PUT
+          - DELETE
+          - PATCH
+          - OPTIONS
+        allowHeaders:
+          - "*"
+        allowCredentials: true
+        maxAge: "24h"
+    - match:
+        - uri:
+            prefix: "/"
+      route:
+        - destination:
+            host: frontend
+            port:
+              number: 3000
+          weight: 100
+      timeout: 30s
+    # Health check endpoint
+    - match:
+        - uri:
+            exact: "/health"
+      route:
+        - destination:
+            host: api-gateway
+            port:
+              number: 8080
+      rewrite:
+        uri: "/health"
+
+---
+# VirtualService për API Gateway direkt nga ingress
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: api-gateway-ingress-vs
+  namespace: techstore
+spec:
+  hosts:
+    - api.techstore.local
+    - "api-gateway.techstore.svc.cluster.local"
+  gateways:
+    - techstore-gateway
+  http:
+    - route:
+        - destination:
+            host: api-gateway
+            port:
+              number: 8080
+          weight: 100
+      timeout: 60s
+      retries:
+        attempts: 3
+        perTryTimeout: 10s

@@ -1,0 +1,20 @@
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: analytics-service-vs
+  namespace: techstore
+spec:
+  hosts:
+    - analytics-service
+    - analytics-service.techstore.svc.cluster.local
+  http:
+    - route:
+        - destination:
+            host: analytics-service
+            subset: v1
+          weight: 100
+      timeout: 45s
+      retries:
+        attempts: 2
+        perTryTimeout: 20s
+        retryOn: 5xx,connect-failure

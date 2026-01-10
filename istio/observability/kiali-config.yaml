@@ -1,0 +1,70 @@
+# Kiali Configuration për service mesh visualization
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kiali
+  namespace: istio-system
+  labels:
+    app: kiali
+data:
+  config.yaml: |
+    deployment:
+      view_only_mode: false
+    authentication:
+      strategy: "anonymous"  # Në production, përdor "token" ose "openid"
+    server:
+      port: 20001
+      web_root: /kiali
+    external_services:
+      prometheus:
+        url: http://prometheus.istio-system:9090
+      grafana:
+        enabled: true
+        in_cluster_url: http://grafana.istio-system:3000
+        url: http://grafana.istio-system:3000
+      tracing:
+        enabled: true
+        in_cluster_url: http://jaeger-query.istio-system:16686
+        url: http://jaeger-query.istio-system:16686
+        namespace_selector: true
+      custom_dashboards:
+        enabled: true
+        discovery_auto_threshold: 10
+        discovery_enabled: "auto"
+        is_core: false
+        namespace_label: "istio-injection"
+        refresh_interval: "60s"
+    istio_namespace: istio-system
+    kiali_feature_flags:
+      certificates_information_indicators:
+        enabled: true
+      disabled_features: []
+      istio_injection_action: true
+      istio_upgrade_action: false
+      ui defaults:
+        graph:
+          find_options:
+          - description: "Find: slow edges (>1s)"
+            expression: "rt > 1000"
+          hide_options:
+          - description: "Hide: healthy nodes"
+            expression: "! has istio_requests_total"
+          layout: "dagre"
+          namespace_layout: "dagre"
+        list:
+          include_health: true
+          include_istio_resources: true
+          include_validations: true
+          show_include_toggles: false
+      validations:
+        ignore:
+        - "KIA0301" # Ignore missing virtual service validation për development
+        - "KIA0206"
+    login_token:
+      signing_key: "kiali-signing-key-change-me"
+    api:
+      namespaces:
+        exclude:
+        - istio-system
+        - kube-system
+        - kube-public
